@@ -5,17 +5,12 @@ import h5py
 import sys
 import os
 import os.path
-
 import logging
-
-from collections import namedtuple
 from astropy.io import fits
 
-
-####################################################################################################
-Constants = namedtuple("Constants", ["nrPix", "nrCap", "nrTempSenor"])
-fact = Constants(nrPix=1440, nrCap=1024, nrTempSenor=160)
-
+NRPIX=1440
+NRCAP=1024
+NRTEMPSENSOR=160
 
 def searchDrsFiles(storeFilename_, dbConfigFile_=None):
     '''
@@ -95,8 +90,7 @@ def saveDrsAttributes(drsFileList_, storeFilename_):
     logging.basicConfig(filename=storeFilename_.split('.')[0]+".log", filemode='w',
                         format='%(levelname)s:%(message)s', level=logging.DEBUG)
 
-    global fact
-    nrFactValues = fact.nrPix*fact.nrCap
+    nrFactValues = NRPIX*NRCAP
 
     with h5py.File(storeFilename_, 'w') as hf:
         hf.create_dataset('CreationDate', (1, 1), dtype='S19', maxshape=(1, 1),
@@ -104,9 +98,9 @@ def saveDrsAttributes(drsFileList_, storeFilename_):
 
         hf.create_dataset("TimeBaseline",    (0, 1), maxshape=(None, 1),
                           compression="gzip", compression_opts=9, fletcher32=True)
-        hf.create_dataset("TempBaseline",    (0, fact.nrTempSenor), maxshape=(None, fact.nrTempSenor),
+        hf.create_dataset("TempBaseline",    (0, NRTEMPSENSOR), maxshape=(None, NRTEMPSENSOR),
                           compression="gzip", compression_opts=9, fletcher32=True)
-        hf.create_dataset("TempStdBaseline", (0, fact.nrTempSenor), maxshape=(None, fact.nrTempSenor),
+        hf.create_dataset("TempStdBaseline", (0, NRTEMPSENSOR), maxshape=(None, NRTEMPSENSOR),
                           compression="gzip", compression_opts=9, fletcher32=True)
         hf.create_dataset("BaselineMean",    (0, nrFactValues), maxshape=(None, nrFactValues),
                           compression="gzip", compression_opts=9, fletcher32=True)
@@ -115,9 +109,9 @@ def saveDrsAttributes(drsFileList_, storeFilename_):
 
         hf.create_dataset("TimeGain",        (0, 1), maxshape=(None, 1),
                           compression="gzip", compression_opts=9, fletcher32=True)
-        hf.create_dataset("TempGain",        (0, fact.nrTempSenor), maxshape=(None, fact.nrTempSenor),
+        hf.create_dataset("TempGain",        (0, NRTEMPSENSOR), maxshape=(None, NRTEMPSENSOR),
                           compression="gzip", compression_opts=9, fletcher32=True)
-        hf.create_dataset("TempStdGain",     (0, fact.nrTempSenor), maxshape=(None, fact.nrTempSenor),
+        hf.create_dataset("TempStdGain",     (0, NRTEMPSENSOR), maxshape=(None, NRTEMPSENSOR),
                           compression="gzip", compression_opts=9, fletcher32=True)
         hf.create_dataset("GainMean",        (0, nrFactValues), maxshape=(None, nrFactValues),
                           compression="gzip", compression_opts=9, fletcher32=True)
@@ -154,8 +148,6 @@ def saveDrsAttributes(drsFileList_, storeFilename_):
 ####################################################################################################
 def saveTupleOfAttribute(tempFilename, drsFilename, storeFilename):
 
-    global fact
-
     loggingFlag = True
     errorFlag = False
     try:
@@ -185,7 +177,7 @@ def saveTupleOfAttribute(tempFilename, drsFilename, storeFilename):
             # print(errorStr)
             logging.error(errorStr)
 
-    if(tabTemp_temp is not None and tabTemp_temp.shape[1] != fact.nrTempSenor):
+    if(tabTemp_temp is not None and tabTemp_temp.shape[1] != NRTEMPSENSOR):
         errorFlag = True
         if(loggingFlag):
             errorStr = ("File not used: Just "+str(tabTemp_temp.shape[1]) +
@@ -391,8 +383,6 @@ def saveFitValues(sourceFilename_, storeFilename_,
     logging.basicConfig(filename=storeFilename_.split('.')[0]+".log", filemode='w',
                         format='%(levelname)s:%(message)s', level=logging.DEBUG)
 
-    global fact
-
     # TODO check are dateBaseline and dateGain alwasy equal (drsFiles taken around 00:00)
     # ->just one indice-list needed
     with h5py.File(sourceFilename_, 'r') as dataSource:
@@ -444,23 +434,23 @@ def saveFitValues(sourceFilename_, storeFilename_,
     gainMeanOffset = []
     gainMeanOffsetStd = []
 
-    print("Calculate fitvalues for '"+str(fact.nrPix)+"' Pixel \n" +
+    print("Calculate fitvalues for '"+str(NRPIX)+"' Pixel \n" +
           "for the period from "+str(firstDate)+" until "+str(lastDate))
 
-    for pixelNr in range(fact.nrPix):
+    for pixelNr in range(NRPIX):
 
-        if(((pixelNr/fact.nrPix*100) % 1) < (((pixelNr-1)/fact.nrPix*100) % 1) and
-           ((pixelNr/fact.nrPix*100) % 1) < (((pixelNr+1)/fact.nrPix*100) % 1)):
-            print("PixelNr:", str('{:4d}'.format(pixelNr+1)), ":", '{:2d}'.format(int(pixelNr/fact.nrPix*100)), '%')
+        if(((pixelNr/NRPIX*100) % 1) < (((pixelNr-1)/NRPIX*100) % 1) and
+           ((pixelNr/NRPIX*100) % 1) < (((pixelNr+1)/NRPIX*100) % 1)):
+            print("PixelNr:", str('{:4d}'.format(pixelNr+1)), ":", '{:2d}'.format(int(pixelNr/NRPIX*100)), '%')
 
         tempBaseline = tempBaselineArray[:, int(pixelNr/9)]
         tempGain = tempGainArray[:, int(pixelNr/9)]
-        for capNr in range(fact.nrCap):
-            baselineMeanCap = baselineMeanArray[:, pixelNr*fact.nrCap+capNr]
-            baselineMeanStdCap = baselineMeanStdArray[:, pixelNr*fact.nrCap+capNr]
+        for capNr in range(NRCAP):
+            baselineMeanCap = baselineMeanArray[:, pixelNr*NRCAP+capNr]
+            baselineMeanStdCap = baselineMeanStdArray[:, pixelNr*NRCAP+capNr]
             baselineMeanStdCapMean = np.mean(baselineMeanStdCap, dtype="float")
-            gainMeanCap = gainMeanArray[:, pixelNr*fact.nrCap+capNr]
-            gainMeanStdCap = gainMeanStdArray[:, pixelNr*fact.nrCap+capNr]
+            gainMeanCap = gainMeanArray[:, pixelNr*NRCAP+capNr]
+            gainMeanStdCap = gainMeanStdArray[:, pixelNr*NRCAP+capNr]
             gainMeanStdCapMean = np.mean(gainMeanStdCap, dtype="float")
 
             try:
