@@ -17,11 +17,11 @@ Constants = namedtuple("Constants", ["nrPix", "nrCap", "nrTempSenor"])
 fact = Constants(nrPix=1440, nrCap=1024, nrTempSenor=160)
 
 
-####################################################################################################
-# 1. search through the fact-database and find all drsFiles
-# 2. filter them, take just one drsFile per day
-####################################################################################################
 def searchDrsFiles(storeFilename_, dbConfigFile_=None):
+    '''
+        1. search through the fact-database and find all drsFiles
+        2. filter them, take just one drsFile per day
+    '''
     print(">> Run 'SearchDrsFiles' <<")
 
     if(not os.path.isdir(storeFilename_[0:storeFilename_.rfind("/")])):
@@ -74,11 +74,12 @@ def searchDrsFiles(storeFilename_, dbConfigFile_=None):
 ####################################################################################################
 ####################################################################################################
 
-# save Baseline and Gain of all drsfiles of the drsFileList
-# together with the mean of Time and Temperature of taking
-# into a .h5 File
-
 def saveDrsAttributes(drsFileList_, storeFilename_):
+    '''
+        save Baseline and Gain of all drsfiles of the drsFileList
+        together with the mean of Time and Temperature of taking
+        into a .h5 File
+    '''
     print(">> Run 'SaveDrsAttributes' <<")
 
     if(os.path.isfile(storeFilename_)):
@@ -364,15 +365,16 @@ def saveTupleOfAttribute(tempFilename, drsFilename, storeFilename):
 ####################################################################################################
 ####################################################################################################
 
-# Calculate the linear fitvalues of Basline and Gain of the .h5 source
-# and store them into a .fits File
-# All Basline/Gain-values with a bigger error than the 'CutOffErrorFactor'"
-# multiplied with the mean of the error from all collected Baseline/Gain-values of the"
-# Capacitor will not used for the fit
-
 def saveFitValues(sourceFilename_, storeFilename_,
                   cutOffErrorFactorBaseline_, cutOffErrorFactorGain_,
                   firstDate_=None, lastDate_=None):
+    '''
+        Calculate the linear fitvalues of Basline and Gain of the .h5 source
+        and store them into a .fits File
+        All Basline/Gain-values with a bigger error than the 'CutOffErrorFactor'"
+        multiplied with the mean of the error from all collected Baseline/Gain-values of the"
+        Capacitor will not used for the fit
+    '''
 
     print(">> Run 'SaveFitValues' <<")
 
