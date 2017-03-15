@@ -1,10 +1,26 @@
-import drsFitValueHandler as handler
-import subprocess as sp
+import drsFitTool as fitTool
 
-sp.Popen([handler.searchDrsFiles(storeFilename_="../data/drsFiles.txt")])
-sp.Popen([handler.filterDrsFiles(sourceFilname_="../data/drsFiles.txt",
-                                 storeFilename_="../data/selectedDrsFiles.txt")])
-sp.Popen([handler.saveDrsAttributes(drsFilname_="../data/selectedDrsFiles.txt",
-                                    storeFilename_="../data/drsData.h5")])
-sp.Popen([handler.saveFitValues(sourceFilname_="../data/drsData.h5",
-                                storeFilename_="../data/fitValuesData.fits")])
+# "/scratch/schulz/"->"/gpfs0/scratch/schulz/"
+
+# 1. search through the fact-database and find all drsFiles
+# 2. filter them, take just one drsFile per day
+fitTool.searchDrsFiles(storeFilename_="/scratch/schulz/drsFiles.txt",
+                       dbConfigFile_="../config/factDbConfig.yaml")
+
+# save Baseline and Gain of all drsfiles of the drsFileList
+# together with the mean of Time and Temperature of taking
+# into a .h5 File
+fitTool.saveDrsAttributes(drsFileList_="/scratch/schulz/drsFiles.txt",
+                          storeFilename_="/scratch/schulz/drsData.h5")
+
+# Calculate the linear fitvalues of Basline and Gain of the .h5 source
+# and store them into a .fits File
+# All Basline/Gain-values with a bigger error than the 'CutOffErrorFactor'"
+# multiplied with the mean of the error from all collected Baseline/Gain-values of the"
+# Capacitor will not used for the fit
+fitTool.saveFitValues(sourceFilename_="/scratch/schulz/drsData.h5",
+                      storeFilename_="/scratch/schulz/fitValues/fitValuesDataInterval.fits",
+                      cutOffErrorFactorBaseline_=2,
+                      cutOffErrorFactorGain_=2,
+                      firstDate_=None,
+                      lastDate_=None)
