@@ -1,4 +1,3 @@
-import drsCalibrationTool as tool
 import matplotlib.pyplot as plt
 
 import matplotlib.dates as dates

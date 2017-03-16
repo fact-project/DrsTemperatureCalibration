@@ -1,4 +1,3 @@
-import drsCalibrationTool as tool
 import subprocess as sp
 import pandas as pd
 import numpy as np

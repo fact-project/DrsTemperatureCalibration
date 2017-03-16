@@ -1,16 +1,17 @@
-import drsCalibrationTool as tool
+import writeSecondaryFiles
+import plotDrsAttributes
 
 # "/gpfs0/scratch/schulz/" -> "/scratch/schulz/"
 # "/fact/ ->
 
-# tool.write.temperatureMaxDifferencesPerPatch(
+# writeSecondaryFiles.temperatureMaxDifferencesPerPatch(
 #     storeFilename_="/gpfs0/scratch/schulz/temperature/tempDiffs2014.fits",
 #     isdcRootPath_="/",
 #     startDate_="2014-01-01",
 #     endDate_="2014-12-31",
 #     freq_="D")
 
-# tool.write.runFactTools(
+# writeSecondaryFiles.runFactTools(
 #     factToolsPath_="/home/florian/Dokumente/Uni/Master/Masterarbeit/FACT/git_fact-tools/target/fact-tools-0.17.2.jar",
 #     factToolsXmlPath_="/home/florian/Dokumente/Uni/Master/Masterarbeit/FACT/git_fact-tools/examples/studies/drsTemperatureCalibrationCheck.xml",
 #     runFile_="/home/florian/Dokumente/Uni/Master/Masterarbeit/isdcRoot/gpfs0/fact/fact-archive/rev_1/raw/2016/10/19/20161019_015.fits.fz",
@@ -20,7 +21,7 @@ import drsCalibrationTool as tool
 #     fitValueDataFilename_="/home/florian/Dokumente/Uni/Master/Masterarbeit/isdcRoot/gpfs0/scratch/schulz/fitValues/fitValuesData_Interval1of1.fits",
 #     intervalFitValueDataFilename_="/home/florian/Dokumente/Uni/Master/Masterarbeit/isdcRoot/gpfs0/scratch/schulz/fitValues/fitValuesData_Interval3of3.fits")
 
-# tool.write.drsPedestalRunNoise(
+# writeSecondaryFiles.drsPedestalRunNoise(
 #     isdcRootPath_="/home/florian/Dokumente/Uni/Master/Masterarbeit/isdcRoot/",
 #     sourcePath_="/home/florian/Dokumente/Uni/Master/Masterarbeit/isdcRoot/gpfs0/scratch/schulz/",
 #     storePath_="/home/florian/Dokumente/Uni/Master/Masterarbeit/isdcRoot/gpfs0/scratch/schulz/",
@@ -48,69 +49,69 @@ import drsCalibrationTool as tool
 # ["2013-08-17", "2014-05-20", "2014-08-11", "2015-05-01", "2015-08-08",
 # "2015-09-05", "2015-11-04", "2015-12-18", "2016-04-10"],
 
-# tool.write.residumOfAllCapacitors(
+# writeSecondaryFiles.residumOfAllCapacitors(
 #     drsFilename_="/gpfs0/scratch/schulz/drsData.h5",
 #     fitFilname_="/gpfs0/scratch/schulz/fitValues/fitValuesData_Interval1of1.fits",
 #     storeFilename_="/gpfs0/scratch/schulz/residuen/residuen_Interval1of1.h5")
 
 
-# tool.write.getMaxTempDiff(
+# writeSecondaryFiles.getMaxTempDiff(
 #    tempDiffFilename_="../../isdcRoot/gpfs0/scratch/schulz/temperature/tempDiffs2016.fits",
 #    maxNr_=2)
 
-# tool.plot.temperatureEraPerPatch(
+# plotDrsAttributes.temperatureEraPerPatch(
 #     patchNr_=100,
 #     start_date_="2016-01-01",
 #     end_date_="2016-12-31",
 #     freq_="D",
 #     storeFilename_="/gpfs0/scratch/schulz/temperature/temperatureEra2016_ofPatch100_sDate20161019.jpg")
 
-# tool.plot.temperaturePerPatch(
+# plotDrsAttributes.temperaturePerPatch(
 #     patchNr_=100,
 #     date_="2016-10-01",
 #     storeFilename_="../plots/temperature/temperature_2016-10-01_ofPatch100.pdf")
 
-#tool.plot.example()
+#plotDrsAttributes.example()
 
-# tool.plot.temperaturePatchMean(
+# plotDrsAttributes.temperaturePatchMean(
 #     start_date_="2016-01-01",
 #     end_date_="2016-12-31",
 #     freq_="D",
 #     storeFilename_="../plots/temperature/temperaturePatchMean2016.pdf")
 
-# tool.plot.temperatureMaxDifferencesPerPatch(
+# plotDrsAttributes.temperatureMaxDifferencesPerPatch(
 #     tempDiffFilename_="../../isdcRoot/gpfs0/scratch/schulz/temperature/tempDiffs2016.fits",
 #     patchNr_=100,
 #     nrBins_=40,
 #     storeFilename_="../plots/temperature/temperatureMaxDifferencesPerPatch100.pdf")
 
 
-# tool.plot.drsValueStdHist(
+# plotDrsAttributes.drsValueStdHist(
 #     drsFilename_="/gpfs0/scratch/schulz/drsData.h5",
 #     valueType_="Baseline", nrBins_=150,
 #     storeFilename_="/gpfs0/scratch/schulz/baselineStdHist.pdf")
 
-# tool.plot.drsValueStdHist(
+# plotDrsAttributes.drsValueStdHist(
 #     drsFilename_="/gpfs0/scratch/schulz/drsData.h5",
 #     valueType_="Gain", nrBins_=150,
 #     storeFilename_="/gpfs0/scratch/schulz/gainStdHist.pdf")
 
 
-# tool.plot.pixelCapacitorDrsValue_test(
+# plotDrsAttributes.pixelCapacitorDrsValue_test(
 #     drsFilename_="../../isdcRoot/gpfs0/scratch/schulz/drsData.h5",
 #     valueType_="Baseline",
 #     pixelNr_=1000, capNr_=500, errFactor_=2.0, showStd_=False,
 #     subTimeInterval_=None,
 #     storeFilename_="../plots/drsValues/fit_pix1000_cap500_baseline+trigger.jpg")
 
-# tool.plot.pixelCapacitorDrsValueInPEA(
+# plotDrsAttributes.pixelCapacitorDrsValueInPEA(
 #     drsFilename_="../../isdcRoot/gpfs0/scratch/schulz/drsData.h5",
 #     valueType_="Baseline",
 #     pixelNr_=1000, capNr_=500, errFactor_=2.0, showStd_=False,
 #     subTimeInterval_=None,
 #     storeFilename_="../plots/drsValues/fit_pix1000_cap500_baseline.pdf")
 
-# tool.plot.residuenPerPixelCapacitor(
+# plotDrsAttributes.residuenPerPixelCapacitor(
 #     drsFilename_="../../isdcRoot/gpfs0/scratch/schulz/drsData.h5",
 #     residuenFilenameArray_=["../../isdcRoot/gpfs0/scratch/schulz/residuen/residuen_Interval1of1.h5"],
 #     valueType_="Baseline",
@@ -118,7 +119,7 @@ import drsCalibrationTool as tool
 #     restrictResiduen_=True,
 #     storeFilename_="../plots/residuen/residuenBaseline_pix1000_cap500_Interval1of1.pdf")
 
-# tool.plot.residuenPerPixelCapacitor(
+# plotDrsAttributes.residuenPerPixelCapacitor(
 #     drsFilename_="../../isdcRoot/gpfs0/scratch/schulz/drsData.h5",
 #     residuenFilenameArray_=["../../isdcRoot/gpfs0/scratch/schulz/residuen/residuen_Interval1of3.h5",
 #                             "../../isdcRoot/gpfs0/scratch/schulz/residuen/residuen_Interval2of3.h5",
@@ -128,7 +129,7 @@ import drsCalibrationTool as tool
 #     restrictResiduen_=True,
 #     storeFilename_="../plots/residuen/residuenGain_pix1000_cap500_3Intervals_RestrictParts.pdf")
 
-# tool.plot.residumMeanOfAllCapacitors(
+# plotDrsAttributes.residumMeanOfAllCapacitors(
 #     drsFilename_="/gpfs0/scratch/schulz/drsData.h5",
 #     residuenFilenameArray_=["../../isdcRoot/gpfs0/scratch/schulz/residuen/residuen_Interval1of3.h5",
 #                             "../../isdcRoot/gpfs0/scratch/schulz/residuen/residuen_Interval2of3.h5",
@@ -137,7 +138,7 @@ import drsCalibrationTool as tool
 #     restrictResiduen_=True,
 #     storeFilename_="/gpfs0/scratch/schulz/residuen/residuenMeanGain_3Intervals_RestrictParts.pdf")
 #
-# tool.plot.residumMeanOfAllCapacitors(
+# plotDrsAttributes.residumMeanOfAllCapacitors(
 #     drsFilename_="/gpfs0/scratch/schulz/drsData.h5",
 #     residuenFilenameArray_=["../../isdcRoot/gpfs0/scratch/schulz/residuen/residuen_Interval1of3.h5",
 #                             "../../isdcRoot/gpfs0/scratch/schulz/residuen/residuen_Interval2of3.h5",
@@ -146,7 +147,7 @@ import drsCalibrationTool as tool
 #     restrictResiduen_=True,
 #     storeFilename_="/gpfs0/scratch/schulz/residuen/residuenMeanBaseline_3Intervals_RestrictParts.pdf")
 
-# tool.plot.residumMeanPerPatchAndInterval(
+# plotDrsAttributes.residumMeanPerPatchAndInterval(
 #     drsFilename_="../../isdcRoot//gpfs0/scratch/schulz/drsData.h5",
 #     residuenFilenameArray_=["../../isdcRoot//gpfs0/scratch/schulz/residuen/residuen_Interval1of3.h5",
 #                             "../../isdcRoot//gpfs0/scratch/schulz/residuen/residuen_Interval2of3.h5",
@@ -155,14 +156,14 @@ import drsCalibrationTool as tool
 #     storeFilename_="/gpfs0/scratch/schulz/residumMeanPerPatchAndInterval_gain.pdf"
 #     )
 
-# tool.plot.residumMeanOfAllCapacitorsPerCrates(
+# plotDrsAttributes.residumMeanOfAllCapacitorsPerCrates(
 #     drsFilename_="/gpfs0/scratch/schulz/drsData.h5",
 #     residuenFilenameArray_=["/gpfs0/scratch/schulz/residuen/residuen_Interval1of1.h5"],
 #     valueType_="Gain",
 #     restrictResiduen_=True,
 #     storeFilename_="/gpfs0/scratch/schulz/residuen/residuenMeanGainPerCrates_Interval1of1.pdf")
 
-# tool.plot.residumMeanOfAllCapacitorsPerCrates(
+# plotDrsAttributes.residumMeanOfAllCapacitorsPerCrates(
 #     drsFilename_="/gpfs0/scratch/schulz/drsData.h5",
 #     residuenFilenameArray_=["/gpfs0/scratch/schulz/residuen/residuen_Interval1of3.h5",
 #                             "/gpfs0/scratch/schulz/residuen/residuen_Interval2of3.h5",
@@ -171,7 +172,7 @@ import drsCalibrationTool as tool
 #     restrictResiduen_=True,
 #     storeFilename_="/gpfs0/scratch/schulz/residuen/residuenGainPerCrates_pix1000_cap500_3Intervals_RestrictParts.pdf")
 
-# tool.plot.noise(
+# plotDrsAttributes.noise(
 #     drsFileCalibrated_=None,
 #     drsModelCalibrated_=None,
 #     drsModelIntervalCalibrated_=None,
@@ -181,7 +182,7 @@ import drsCalibrationTool as tool
 #     sourceFile_=("/home/florian/Dokumente/Uni/Master/Masterarbeit/isdcRoot/" +
 #                  "gpfs0/scratch/schulz/noise/test_15.fits"))
 # #
-# tool.plot.noiseFactCam(
+# plotDrsAttributes.noiseFactCam(
 #     drsFileCalibrated_=None,
 #     drsModelCalibrated_=None,
 #     drsModelIntervalCalibrated_=None,
@@ -189,9 +190,9 @@ import drsCalibrationTool as tool
 #     sourceFile_=("/home/florian/Dokumente/Uni/Master/Masterarbeit/isdcRoot/" +
 #                  "gpfs0/scratch/schulz/noise/test_15.fits"))
 
-# tool.plot.pedestialNoise(
+# plotDrsAttributes.pedestialNoise(
 #     filename_=("/home/florian/Dokumente/Uni/Master/Masterarbeit/isdcRoot/" +
 #                "gpfs0/scratch/schulz/noise/pedestelNoise20160901.fits"),
 #     save_=True)
 
-tool.plot.plot()
+plotDrsAttributes.plot()
