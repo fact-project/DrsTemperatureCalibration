@@ -157,8 +157,7 @@ def saveTupleOfAttribute(tempFilename, drsFilename, storeFilename):
             drsFilename,
             ignoremissing=True,
             ignore_missing_end=True)
-
-    except Exception as errInfos:
+    except:
         logging.exception(
             "LoadingError: in'"+drsFilename+"' or '"+tempFilename)
 
@@ -169,13 +168,8 @@ def saveTupleOfAttribute(tempFilename, drsFilename, storeFilename):
         tabTemp_time = tabTemp[1].data["Time"]
         tabTemp_temp = tabTemp[1].data["temp"]
         tabTempDatetime = pd.to_datetime(tabTemp_time * 24 * 3600 * 1e9)
-
-    except Exception as errInfos:
-        errorFlag = True
-        if(loggingFlag):
-            errorStr = " In File '"+tempFilename+"': "+str(errInfos)
-            # print(errorStr)
-            logging.error(errorStr)
+    except:
+        logging.exception("In File:"+tempFilename)
 
     if(tabTemp_temp is not None and tabTemp_temp.shape[1] != NRTEMPSENSOR):
         errorFlag = True
@@ -190,23 +184,14 @@ def saveTupleOfAttribute(tempFilename, drsFilename, storeFilename):
     endRun_0 = None
     try:
         begRun_0 = pd.to_datetime(tabDrs[1].header["RUN0-BEG"])
-
-    except Exception as errInfos:
-        errorFlag = True
-        if(loggingFlag):
-            errorStr = " In File '"+drsFilename+"': "+str(errInfos)
-            # print(errorStr)
-            logging.error(errorStr)
+    except:
+        logging.exception(" In File:"+drsFilename)
 
     try:
         endRun_0 = pd.to_datetime(tabDrs[1].header["RUN0-END"])
+    except:
+        logging.exception(" In File:"+drsFilename)
 
-    except Exception as errInfos:
-        errorFlag = True
-        if(loggingFlag):
-            errorStr = " In File '"+drsFilename+"': "+str(errInfos)
-            # print(errorStr)
-            logging.error(errorStr)
 
     if(errorFlag is False):
         baselineMean = tabDrs[1].data["BaselineMean"][0]
@@ -251,23 +236,14 @@ def saveTupleOfAttribute(tempFilename, drsFilename, storeFilename):
     endRun_1 = None
     try:
         begRun_1 = pd.to_datetime(tabDrs[1].header["RUN1-BEG"])
-
-    except Exception as errInfos:
-        errorFlag = True
-        if(loggingFlag):
-            errorStr = " In File '"+drsFilename+"': "+str(errInfos)
-            # print(errorStr)
-            logging.error(errorStr)
+    except:
+        logging.exception(" In File:"+drsFilename)
 
     try:
         endRun_1 = pd.to_datetime(tabDrs[1].header["RUN1-END"])
+    except:
+        logging.exception(" In File:"+drsFilename)
 
-    except Exception as errInfos:
-        errorFlag = True
-        if(loggingFlag):
-            errorStr = " In File '"+drsFilename+"': "+str(errInfos)
-            # print(errorStr)
-            logging.error(errorStr)
 
     if(errorFlag is False):
         gainMean = tabDrs[1].data["GainMean"][0]
