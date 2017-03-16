@@ -11,7 +11,6 @@ from collections import namedtuple
 from astropy.io import fits
 from fact.credentials import create_factdb_engine
 
-
 ####################################################################################################
 Constants = namedtuple("Constants", ["nrPix", "nrCap", "nrTempSenor"])
 fact = Constants(nrPix=1440, nrCap=1024, nrTempSenor=160)
@@ -590,3 +589,37 @@ def getLinearFitValues(xValues_, yValues_, yValuesErrors_=[]):
     cov = [[S_1/D, -S_x/D], [-S_x/D, S_xx/D]]
 
     return(var, cov)
+
+
+def test_getLinearFitValues_no_noise():
+    from numpy.testing import assert_almost_equal
+
+    def linear_function(x, slope=5, intercept=7):
+        return slope * x + intercept
+
+    x = np.arange(100)
+    y = linear_function(x)
+    w = np.ones_like(x)
+
+    true_fit, true_cov = np.polyfit(x,  y, w=w, deg=1, cov=True)
+    var, cov = getLinearFitValues(x, y, w)
+
+    assert_almost_equal(true_fit, var)
+    assert_almost_equal(true_cov, cov)
+
+
+def test_getLinearFitValues_with_noise():
+    from numpy.testing import assert_almost_equal
+
+    def linear_function(x, slope=5, intercept=7):
+        return slope * x + intercept
+
+    x = np.arange(100)
+    y = linear_function(x) + np.random.normal(0, 10, size=x.size)
+    w = np.ones_like(x)
+
+    true_fit, true_cov = np.polyfit(x,  y, w=w, deg=1, cov=True)
+    var, cov = getLinearFitValues(x, y, w)
+
+    assert_almost_equal(true_fit, var)
+    assert_almost_equal(true_cov, cov)
