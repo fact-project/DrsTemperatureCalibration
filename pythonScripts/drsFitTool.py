@@ -124,9 +124,9 @@ def saveDrsAttributes(drsFileList_, storeFilename_):
     for drsFilename in tqdm(drsFileList):
         drsFilename = drsFilename.strip("\n")
 
-        tempFilename = (str("/fact/aux") +
-                        str(drsFilename.split('_')[0].split("raw")[-1]) +
-                        str(".FAD_CONTROL_TEMPERATURE.fits"))
+        path_part = drsFilename.split('_')[0].split("raw")[-1]
+        tempFilename = "/fact/aux{0}.FAD_CONTROL_TEMPERATURE.fits".format(
+            path_part)
 
         if(os.path.isfile(drsFilename) and os.path.isfile(tempFilename)):
             saveTupleOfAttribute(tempFilename, drsFilename, storeFilename_)
