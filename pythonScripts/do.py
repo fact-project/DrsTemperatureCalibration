@@ -8,8 +8,7 @@ import drsCalibrationTool as tool
 #     isdcRootPath_="/",
 #     startDate_="2014-01-01",
 #     endDate_="2014-12-31",
-#     freq_="D",
-#     dbConfigFile_="../config/factDbConfig.yaml")
+#     freq_="D")
 
 # tool.write.runFactTools(
 #     factToolsPath_="/home/florian/Dokumente/Uni/Master/Masterarbeit/FACT/git_fact-tools/target/fact-tools-0.17.2.jar",
@@ -29,8 +28,7 @@ import drsCalibrationTool as tool
 #     intervalFitValueDataFilename_="/home/florian/Dokumente/Uni/Master/Masterarbeit/isdcRoot/gpfs0/scratch/schulz/fitValues/fitValuesData_Interval3of3.fits",
 #     startDate_="2016-09-01",
 #     endDate_="2016-09-01",
-#     freq_="D",
-#     dbConfigFile_="../config/factDbConfig.yaml")
+#     freq_="D")
 
 # Hardware changes cut: "2014-05-01", "2015-05-01" (no data taken between 2014-04-21 until 2014-05-22
 #                                                             and between 2015-04-30 until 2015-05-06
@@ -70,8 +68,7 @@ import drsCalibrationTool as tool
 # tool.plot.temperaturePerPatch(
 #     patchNr_=100,
 #     date_="2016-10-01",
-#     storeFilename_="../plots/temperature/temperature_2016-10-01_ofPatch100.pdf",
-#     dbConfigFile_="../config/factDbConfig.yaml")
+#     storeFilename_="../plots/temperature/temperature_2016-10-01_ofPatch100.pdf")
 
 #tool.plot.example()
 

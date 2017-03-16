@@ -4,8 +4,7 @@ import drsFitTool as fitTool
 
 # 1. search through the fact-database and find all drsFiles
 # 2. filter them, take just one drsFile per day
-fitTool.searchDrsFiles(storeFilename_="/scratch/schulz/drsFiles.txt",
-                       dbConfigFile_="../config/factDbConfig.yaml")
+fitTool.searchDrsFiles(storeFilename_="/scratch/schulz/drsFiles.txt")
 
 # save Baseline and Gain of all drsfiles of the drsFileList
 # together with the mean of Time and Temperature of taking

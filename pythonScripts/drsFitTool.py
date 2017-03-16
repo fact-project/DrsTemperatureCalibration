@@ -21,7 +21,7 @@ fact = Constants(nrPix=1440, nrCap=1024, nrTempSenor=160)
 # 1. search through the fact-database and find all drsFiles
 # 2. filter them, take just one drsFile per day
 ####################################################################################################
-def searchDrsFiles(storeFilename_, dbConfigFile_=None):
+def searchDrsFiles(storeFilename_):
     print(">> Run 'SearchDrsFiles' <<")
 
     if(not os.path.isdir(storeFilename_[0:storeFilename_.rfind("/")])):
