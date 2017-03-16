@@ -143,77 +143,50 @@ def saveDrsAttributes(drsFileList_, storeFilename_):
     print(">> Finished 'SaveDrsAttributes' <<")
 
 
-####################################################################################################
 def saveTupleOfAttribute(tempFilename, drsFilename, storeFilename):
-
-    loggingFlag = True
     try:
-        tabTemp = fits.open(
-            tempFilename,
-            ignoremissing=True,
-            ignore_missing_end=True)
-        tabDrs = fits.open(
-            drsFilename,
-            ignoremissing=True,
-            ignore_missing_end=True)
+        saveTupleOfAttribute_no_try(tempFilename, drsFilename, storeFilename)
     except:
-        logging.exception(
-            "LoadingError: in'"+drsFilename+"' or '"+tempFilename)
+        logging.exception()
         return
 
-    tabTemp_time = None
-    tabTemp_temp = None
-    tabTempDatetime = None
-    try:
-        tabTemp_time = tabTemp[1].data["Time"]
-        tabTemp_temp = tabTemp[1].data["temp"]
-        tabTempDatetime = pd.to_datetime(tabTemp_time * 24 * 3600 * 1e9)
-    except:
-        logging.exception("In File:"+tempFilename)
-        return
 
-    if(tabTemp_temp is not None and tabTemp_temp.shape[1] != NRTEMPSENSOR):
-        if(loggingFlag):
-            errorStr = ("File not used: Just "+str(tabTemp_temp.shape[1]) +
-                        " Temperature Values in File '"+tempFilename+"'")
-            # print(errorStr)
-            logging.error(errorStr)
-        return
+def saveTupleOfAttribute_no_try(tempFilename, drsFilename, storeFilename):
 
-    begRun_0 = None
-    endRun_0 = None
-    try:
-        begRun_0 = pd.to_datetime(tabDrs[1].header["RUN0-BEG"])
-    except:
-        logging.exception(" In File:"+drsFilename)
-        return
+    tabTemp = fits.open(
+        tempFilename,
+        ignoremissing=True,
+        ignore_missing_end=True)
+    tabDrs = fits.open(
+        drsFilename,
+        ignoremissing=True,
+        ignore_missing_end=True)
 
-    try:
-        endRun_0 = pd.to_datetime(tabDrs[1].header["RUN0-END"])
-    except:
-        logging.exception(" In File:"+drsFilename)
-        return
+    tabTemp_time = tabTemp[1].data["Time"]
+    tabTemp_temp = tabTemp[1].data["temp"]
+    tabTempDatetime = pd.to_datetime(tabTemp_time * 24 * 3600 * 1e9)
 
+    if tabTemp_temp.shape[1] != NRTEMPSENSOR:
+        errorStr = ("File not used: Just "+str(tabTemp_temp.shape[1]) +
+                    " Temperature Values in File '"+tempFilename+"'")
+        raise Exception(errorStr)
+
+    begRun_0 = pd.to_datetime(tabDrs[1].header["RUN0-BEG"])
+    endRun_0 = pd.to_datetime(tabDrs[1].header["RUN0-END"])
     baselineMean = tabDrs[1].data["BaselineMean"][0]
     baselineMeanStd = tabDrs[1].data["BaselineRms"][0]
 
     baselineMeanNulls = list(np.array(np.where(baselineMean == 0.)[0]))
     if (len(baselineMeanNulls) != 0.):
-        if(loggingFlag):
-            errorStr = (" File not used: Nulls of baselineMean in File '"+str(drsFilename) +
-                        "' Nulls at Index:\n"+str(baselineMeanNulls))
-            # print(errorStr)
-            logging.error(errorStr)
-        return
+        errorStr = (" File not used: Nulls of baselineMean in File '"+str(drsFilename) +
+                    "' Nulls at Index:\n"+str(baselineMeanNulls))
+        raise Exception(errorStr)
 
     baselineMeanStdNulls = list(np.array(np.where(baselineMeanStd == 0.)[0]))
     if (len(baselineMeanStdNulls) != 0.):
-        if(loggingFlag):
-            errorStr = (" File not used: Nulls of baselineMeanStd in File '"+str(drsFilename) +
-                        "' Nulls at Index:\n"+str(baselineMeanStdNulls))
-            # print(errorStr)
-            logging.error(errorStr)
-        return
+        errorStr = (" File not used: Nulls of baselineMeanStd in File '"+str(drsFilename) +
+                    "' Nulls at Index:\n"+str(baselineMeanStdNulls))
+        raise Exception(errorStr)
 
     indicesRun_0 = np.where((tabTempDatetime > begRun_0) & (tabTempDatetime < endRun_0))[0]
     timeValuesRun_0 = np.array(tabTemp_time[indicesRun_0])
@@ -231,40 +204,22 @@ def saveTupleOfAttribute(tempFilename, drsFilename, storeFilename):
         tempBaseline = tempValuesRun_0
         tempStdBaseline = np.zeros(tempValuesRun_0.shape[1])
 
-    begRun_1 = None
-    endRun_1 = None
-    try:
-        begRun_1 = pd.to_datetime(tabDrs[1].header["RUN1-BEG"])
-    except:
-        logging.exception(" In File:"+drsFilename)
-        return
-
-    try:
-        endRun_1 = pd.to_datetime(tabDrs[1].header["RUN1-END"])
-    except:
-        logging.exception(" In File:"+drsFilename)
-        return
-
+    begRun_1 = pd.to_datetime(tabDrs[1].header["RUN1-BEG"])
+    endRun_1 = pd.to_datetime(tabDrs[1].header["RUN1-END"])
     gainMean = tabDrs[1].data["GainMean"][0]
     gainMeanStd = tabDrs[1].data["GainRms"][0]
 
     gainMeanNulls = list(np.array(np.where(gainMean == 0.)[0]))
     if (len(gainMeanNulls) != 0.):
-        if(loggingFlag):
-            errorStr = (" File not used: Nulls of gainMean in File '"+str(drsFilename) +
-                        "' Nulls at Index:\n"+str(gainMeanNulls))
-            # print(errorStr)
-            logging.error(errorStr)
-        return
+        errorStr = (" File not used: Nulls of gainMean in File '"+str(drsFilename) +
+                    "' Nulls at Index:\n"+str(gainMeanNulls))
+        raise Exception(errorStr)
 
     gainMeanStdNulls = list(np.array(np.where(gainMeanStd == 0.)[0]))
     if (len(gainMeanStdNulls) != 0.):
-        if(loggingFlag):
-            errorStr = (" File not used: Nulls of gainMeanStd in File '"+str(drsFilename) +
-                        "' Nulls at Index:\n"+str(gainMeanStdNulls))
-            # print(errorStr)
-            logging.error(errorStr)
-        return
+        errorStr = (" File not used: Nulls of gainMeanStd in File '"+str(drsFilename) +
+                    "' Nulls at Index:\n"+str(gainMeanStdNulls))
+        raise Exception(errorStr)
 
     indicesRun_1 = np.where((tabTempDatetime > begRun_1) & (tabTempDatetime < endRun_1))[0]
     timeValuesRun_1 = np.array(tabTemp_time[indicesRun_1])
