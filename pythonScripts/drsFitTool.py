@@ -160,6 +160,7 @@ def saveTupleOfAttribute(tempFilename, drsFilename, storeFilename):
     except:
         logging.exception(
             "LoadingError: in'"+drsFilename+"' or '"+tempFilename)
+        return
 
     tabTemp_time = None
     tabTemp_temp = None
@@ -170,6 +171,7 @@ def saveTupleOfAttribute(tempFilename, drsFilename, storeFilename):
         tabTempDatetime = pd.to_datetime(tabTemp_time * 24 * 3600 * 1e9)
     except:
         logging.exception("In File:"+tempFilename)
+        return
 
     if(tabTemp_temp is not None and tabTemp_temp.shape[1] != NRTEMPSENSOR):
         errorFlag = True
@@ -186,14 +188,15 @@ def saveTupleOfAttribute(tempFilename, drsFilename, storeFilename):
         begRun_0 = pd.to_datetime(tabDrs[1].header["RUN0-BEG"])
     except:
         logging.exception(" In File:"+drsFilename)
+        return
 
     try:
         endRun_0 = pd.to_datetime(tabDrs[1].header["RUN0-END"])
     except:
         logging.exception(" In File:"+drsFilename)
+        return
 
-
-    if(errorFlag is False):
+    if not errorFlag:
         baselineMean = tabDrs[1].data["BaselineMean"][0]
         baselineMeanStd = tabDrs[1].data["BaselineRms"][0]
 
@@ -215,7 +218,6 @@ def saveTupleOfAttribute(tempFilename, drsFilename, storeFilename):
                 # print(errorStr)
                 logging.error(errorStr)
 
-    if(errorFlag is False):
         indicesRun_0 = np.where((tabTempDatetime > begRun_0) & (tabTempDatetime < endRun_0))[0]
         timeValuesRun_0 = np.array(tabTemp_time[indicesRun_0])
         tempValuesRun_0 = np.array(tabTemp_temp[indicesRun_0])
@@ -238,14 +240,15 @@ def saveTupleOfAttribute(tempFilename, drsFilename, storeFilename):
         begRun_1 = pd.to_datetime(tabDrs[1].header["RUN1-BEG"])
     except:
         logging.exception(" In File:"+drsFilename)
+        return
 
     try:
         endRun_1 = pd.to_datetime(tabDrs[1].header["RUN1-END"])
     except:
         logging.exception(" In File:"+drsFilename)
+        return
 
-
-    if(errorFlag is False):
+    if not errorFlag:
         gainMean = tabDrs[1].data["GainMean"][0]
         gainMeanStd = tabDrs[1].data["GainRms"][0]
 
@@ -267,7 +270,6 @@ def saveTupleOfAttribute(tempFilename, drsFilename, storeFilename):
                 # print(errorStr)
                 logging.error(errorStr)
 
-    if(errorFlag is False):
         indicesRun_1 = np.where((tabTempDatetime > begRun_1) & (tabTempDatetime < endRun_1))[0]
         timeValuesRun_1 = np.array(tabTemp_time[indicesRun_1])
         tempValuesRun_1 = np.array(tabTemp_temp[indicesRun_1])
@@ -284,8 +286,7 @@ def saveTupleOfAttribute(tempFilename, drsFilename, storeFilename):
             tempGain = tempValuesRun_1
             tempStdGain = np.zeros(tempValuesRun_1.shape[1])
 
-    with h5py.File(storeFilename) as store:
-        if(errorFlag is False):
+        with h5py.File(storeFilename) as store:
             data = store["TimeBaseline"]
             data.resize((len(data)+1, data.maxshape[1]))
             data[len(data)-1, :] = timeBaseline
