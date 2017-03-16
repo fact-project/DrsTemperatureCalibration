@@ -21,5 +21,9 @@ setup(
         'scipy',
         'matplotlib>=1.4',
     ],
+    entry_points={'console_scripts': [
+        'drsTempCalib_train = drsTemperatureCalibration.writeFitValueFile:main',
+        'drsTempCalib_make_plots = drsTemperatureCalibration.do:main',
+    ]},
     zip_safe=False,
 )
