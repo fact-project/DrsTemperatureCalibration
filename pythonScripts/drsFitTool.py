@@ -9,9 +9,16 @@ import logging
 from astropy.io import fits
 from tqdm import tqdm
 
-NRPIX=1440
-NRCAP=1024
-NRTEMPSENSOR=160
+NRPIX = 1440
+NRCAP = 1024
+NRTEMPSENSOR = 160
+
+
+def add_creation_date(storeFilename_):
+    creationDateStr = pd.datetime.now().strftime('%Y-%m-%d %H:%M:%S').encode("UTF-8", "ignore")
+    with h5py.File(storeFilename_) as store:
+        store['CreationDate'][0] = [creationDateStr]
+
 
 def searchDrsFiles(storeFilename_, dbConfigFile_=None):
     '''
@@ -131,10 +138,7 @@ def saveDrsAttributes(drsFileList_, storeFilename_):
         if(os.path.isfile(drsFilename) and os.path.isfile(tempFilename)):
             saveTupleOfAttribute(tempFilename, drsFilename, storeFilename_)
 
-    print("Add CreationDate")
-    creationDateStr = pd.datetime.now().strftime('%Y-%m-%d %H:%M:%S').encode("UTF-8", "ignore")
-    with h5py.File(storeFilename_) as store:
-        store['CreationDate'][0] = [creationDateStr]
+    add_creation_date(storeFilename_)
 
     print(">> Finished 'SaveDrsAttributes' <<")
 
