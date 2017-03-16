@@ -208,18 +208,13 @@ def saveTupleOfAttribute_no_try(tempFilename, drsFilename, storeFilename):
         drsFilename,
         ignoremissing=True,
         ignore_missing_end=True)
-
-    begRun_0 = pd.to_datetime(tabDrs[1].header["RUN0-BEG"])
-    endRun_0 = pd.to_datetime(tabDrs[1].header["RUN0-END"])
-    begRun_1 = pd.to_datetime(tabDrs[1].header["RUN1-BEG"])
-    endRun_1 = pd.to_datetime(tabDrs[1].header["RUN1-END"])
+    header = tabDrs[1].header
+    bintable = tabDrs[1].data
 
     baselineMean = tabDrs[1].data["BaselineMean"][0]
     baselineMeanStd = tabDrs[1].data["BaselineRms"][0]
     gainMean = tabDrs[1].data["GainMean"][0]
     gainMeanStd = tabDrs[1].data["GainRms"][0]
-
-
 
     baselineMeanNulls = list(np.array(np.where(baselineMean == 0.)[0]))
     if (len(baselineMeanNulls) != 0.):
@@ -248,51 +243,32 @@ def saveTupleOfAttribute_no_try(tempFilename, drsFilename, storeFilename):
     temps_of_runs = read_temps_of_runs(
         tempFilename,
         runtimeslist=[
-            (begRun_0, endRun_0),
-            (begRun_1, endRun_1)
+            (
+                pd.to_datetime(header["RUN0-BEG"]),
+                pd.to_datetime(header["RUN0-END"])
+            ),
+            (
+                pd.to_datetime(header["RUN1-BEG"]),
+                pd.to_datetime(header["RUN1-END"])
+            ),
         ])
 
+    def my_store(store, name, what):
+        data = store[name]
+        data.resize((len(data)+1, data.maxshape[1]))
+        data[len(data)-1, :] = what
+
     with h5py.File(storeFilename) as store:
-        data = store["TimeBaseline"]
-        data.resize((len(data)+1, data.maxshape[1]))
-        data[len(data)-1, :] = temps_of_runs[0]['mean_time']
-
-        data = store["TempBaseline"]
-        data.resize((len(data)+1, data.maxshape[1]))
-        data[len(data)-1, :] = temps_of_runs[0]['mean_temp']
-
-        data = store["TempStdBaseline"]
-        data.resize((len(data)+1, data.maxshape[1]))
-        data[len(data)-1, :] = temps_of_runs[0]['std_temp']
-
-        data = store["BaselineMean"]
-        data.resize((len(data)+1, data.maxshape[1]))
-        data[len(data)-1, :] = baselineMean
-
-        data = store["BaselineMeanStd"]
-        data.resize((len(data)+1, data.maxshape[1]))
-        data[len(data)-1, :] = baselineMeanStd
-
-        data = store["TimeGain"]
-        data.resize((len(data)+1, data.maxshape[1]))
-        data[len(data)-1, :] = temps_of_runs[1]['mean_time']
-
-        data = store["TempGain"]
-        data.resize((len(data)+1, data.maxshape[1]))
-        data[len(data)-1, :] = temps_of_runs[1]['mean_temp']
-
-        data = store["TempStdGain"]
-        data.resize((len(data)+1, data.maxshape[1]))
-        data[len(data)-1, :] = temps_of_runs[1]['std_temp']
-
-        data = store["GainMean"]
-        data.resize((len(data)+1, data.maxshape[1]))
-        data[len(data)-1, :] = gainMean
-
-        data = store["GainMeanStd"]
-        data.resize((len(data)+1, data.maxshape[1]))
-        data[len(data)-1, :] = gainMeanStd
-
+        my_store(store, "TimeBaseline", temps_of_runs[0]['mean_time'])
+        my_store(store, "TempBaseline", temps_of_runs[0]['mean_temp'])
+        my_store(store, "TempStdBaseline", temps_of_runs[0]['std_temp'])
+        my_store(store, "BaselineMean", baselineMean)
+        my_store(store, "BaselineMeanStd", baselineMeanStd)
+        my_store(store, "TimeGain", temps_of_runs[1]['mean_time'])
+        my_store(store, "TempGain", temps_of_runs[1]['mean_temp'])
+        my_store(store, "TempStdGain", temps_of_runs[1]['std_temp'])
+        my_store(store, "GainMean", gainMean)
+        my_store(store, "GainMeanStd", gainMeanStd)
 
 ####################################################################################################
 ####################################################################################################
