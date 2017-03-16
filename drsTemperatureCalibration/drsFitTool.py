@@ -9,9 +9,7 @@ from astropy.io import fits
 from tqdm import tqdm
 from fact.credentials import create_factdb_engine
 from .tools import getLinearFitValues
-NRPIX = 1440
-NRCAP = 1024
-NRTEMPSENSOR = 160
+from .constants import *
 
 
 def add_creation_date(storeFilename_):
