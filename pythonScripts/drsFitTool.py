@@ -149,16 +149,18 @@ def saveTupleOfAttribute(tempFilename, drsFilename, storeFilename):
     loggingFlag = True
     errorFlag = False
     try:
-        tabTemp = fits.open(tempFilename, ignoremissing=True, ignore_missing_end=True)
-        tabDrs = fits.open(drsFilename, ignoremissing=True, ignore_missing_end=True)
+        tabTemp = fits.open(
+            tempFilename,
+            ignoremissing=True,
+            ignore_missing_end=True)
+        tabDrs = fits.open(
+            drsFilename,
+            ignoremissing=True,
+            ignore_missing_end=True)
 
     except Exception as errInfos:
-        errorFlag = True
-        if(loggingFlag):
-            errorStr = " LoadingError: in'"+drsFilename+"' or '"+tempFilename+"' ("+str(errInfos)+")"
-            # print(errorStr)
-            logging.critical(errorStr)
-        return
+        logging.exception(
+            "LoadingError: in'"+drsFilename+"' or '"+tempFilename)
 
     tabTemp_time = None
     tabTemp_temp = None
