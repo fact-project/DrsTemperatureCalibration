@@ -93,6 +93,9 @@ def saveDrsAttributes(drsFileList_, storeFilename_):
     nrFactValues = NRPIX*NRCAP
 
     def create_my_dataset(file, name, shape=None, maxshape=None, dtype=None):
+        if maxshape is None:
+            maxshape = tuple(x if x!=0 else None for x in shape)
+
         file.create_dataset(
             name,
             shape,
@@ -104,17 +107,17 @@ def saveDrsAttributes(drsFileList_, storeFilename_):
         )
 
     with h5py.File(storeFilename_, 'w') as hf:
-        create_my_dataset(hf, 'CreationDate',    (1, 1), dtype='S19', maxshape=(1, 1))
-        create_my_dataset(hf, "TimeBaseline",    (0, 1), maxshape=(None, 1))
-        create_my_dataset(hf, "TempBaseline",    (0, NRTEMPSENSOR), maxshape=(None, NRTEMPSENSOR))
-        create_my_dataset(hf, "TempStdBaseline", (0, NRTEMPSENSOR), maxshape=(None, NRTEMPSENSOR))
-        create_my_dataset(hf, "BaselineMean",    (0, nrFactValues), maxshape=(None, nrFactValues))
-        create_my_dataset(hf, "BaselineMeanStd", (0, nrFactValues), maxshape=(None, nrFactValues))
-        create_my_dataset(hf, "TimeGain",        (0, 1), maxshape=(None, 1))
-        create_my_dataset(hf, "TempGain",        (0, NRTEMPSENSOR), maxshape=(None, NRTEMPSENSOR))
-        create_my_dataset(hf, "TempStdGain",     (0, NRTEMPSENSOR), maxshape=(None, NRTEMPSENSOR))
-        create_my_dataset(hf, "GainMean",        (0, nrFactValues), maxshape=(None, nrFactValues))
-        create_my_dataset(hf, "GainMeanStd",     (0, nrFactValues), maxshape=(None, nrFactValues))
+        create_my_dataset(hf, 'CreationDate',    (1, 1), dtype='S19')
+        create_my_dataset(hf, "TimeBaseline",    (0, 1))
+        create_my_dataset(hf, "TempBaseline",    (0, NRTEMPSENSOR))
+        create_my_dataset(hf, "TempStdBaseline", (0, NRTEMPSENSOR))
+        create_my_dataset(hf, "BaselineMean",    (0, nrFactValues))
+        create_my_dataset(hf, "BaselineMeanStd", (0, nrFactValues))
+        create_my_dataset(hf, "TimeGain",        (0, 1))
+        create_my_dataset(hf, "TempGain",        (0, NRTEMPSENSOR))
+        create_my_dataset(hf, "TempStdGain",     (0, NRTEMPSENSOR))
+        create_my_dataset(hf, "GainMean",        (0, nrFactValues))
+        create_my_dataset(hf, "GainMeanStd",     (0, nrFactValues))
 
     count = 0
     countMax = sum(1 for line in open(drsFileList_))
