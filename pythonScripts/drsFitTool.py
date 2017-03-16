@@ -7,6 +7,7 @@ import os
 import os.path
 import logging
 from astropy.io import fits
+from tqdm import tqdm
 
 NRPIX=1440
 NRCAP=1024
@@ -119,24 +120,16 @@ def saveDrsAttributes(drsFileList_, storeFilename_):
         create_my_dataset(hf, "GainMean",        (0, nrFactValues))
         create_my_dataset(hf, "GainMeanStd",     (0, nrFactValues))
 
-    count = 0
-    countMax = sum(1 for line in open(drsFileList_))
-    with open(drsFileList_) as drsFileList:
-        print("Check '", countMax, "' drsFiles'")
-        for drsFilename in drsFileList:
-            drsFilename = drsFilename.strip("\n")
-            count = count + 1
+    drsFileList_ = open(drsFileList_).read().splitlines()
+    for drsFilename in tqdm(drsFileList):
+        drsFilename = drsFilename.strip("\n")
 
-            if(((count/countMax*100) % 1) < (((count-1)/countMax*100) % 1) and
-               ((count/countMax*100) % 1) < (((count+1)/countMax*100) % 1)):
-                print('{:4d}'.format(count), ":", '{:2d}'.format(int(count/countMax*100)), '%')
+        tempFilename = (str("/fact/aux") +
+                        str(drsFilename.split('_')[0].split("raw")[-1]) +
+                        str(".FAD_CONTROL_TEMPERATURE.fits"))
 
-            tempFilename = (str("/fact/aux") +
-                            str(drsFilename.split('_')[0].split("raw")[-1]) +
-                            str(".FAD_CONTROL_TEMPERATURE.fits"))
-
-            if(os.path.isfile(drsFilename) and os.path.isfile(tempFilename)):
-                saveTupleOfAttribute(tempFilename, drsFilename, storeFilename_)
+        if(os.path.isfile(drsFilename) and os.path.isfile(tempFilename)):
+            saveTupleOfAttribute(tempFilename, drsFilename, storeFilename_)
 
     print("Add CreationDate")
     creationDateStr = pd.datetime.now().strftime('%Y-%m-%d %H:%M:%S').encode("UTF-8", "ignore")
