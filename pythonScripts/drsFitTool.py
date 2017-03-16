@@ -151,30 +151,75 @@ def saveTupleOfAttribute(tempFilename, drsFilename, storeFilename):
         return
 
 
-def saveTupleOfAttribute_no_try(tempFilename, drsFilename, storeFilename):
-
-    tabTemp = fits.open(
-        tempFilename,
+def read_temps_of_runs(path, runtimeslist):
+    '''
+    runtimeslist a list() of tuples of (start, end) times
+    between which we want to read the "Time" and "temp" arrays
+    from the fits file under `path`.
+    '''
+    table = fits.open(
+        path,
         ignoremissing=True,
         ignore_missing_end=True)
-    tabDrs = fits.open(
+
+    table_time = table[1].data["Time"]
+    table_temperature = table[1].data["temp"]
+
+    if table_temperature.shape[1] != NRTEMPSENSOR:
+        message = (
+            "File not used: Just "+str(table_temperature.shape[1]) +
+            " Temperature Values in File '"+path+"'")
+        raise Exception(message)
+
+    results = []
+    table_datetime = pd.to_datetime(table_time * 24 * 3600 * 1e9)
+    for start, end in runtimeslist:
+        idx = np.where(
+            (table_datetime > start) &
+            (table_datetime < end)
+            )[0]
+        timestamps_during_run = np.array(table_time[idx])
+        temperature_during_run = np.array(table_temperature[idx])
+
+        if timestamps_during_run.shape[0] > 1:
+            mean_time = np.mean(timestamps_during_run, dtype="float64")
+        else:
+            mean_time = timestamps_during_run
+
+        if temperature_during_run.shape[0] > 1:
+            mean_temp = np.mean(temperature_during_run, dtype="float64", axis=0)
+            std_temp = np.std(temperature_during_run, dtype="float64", axis=0, ddof=1)
+        else:
+            mean_temp = temperature_during_run
+            std_temp = np.zeros(temperature_during_run.shape[1])
+
+        results.append(dict(
+            mean_time=mean_time,
+            mean_temp=mean_temp,
+            std_temp=std_temp,
+            )
+        )
+    return results
+
+
+def saveTupleOfAttribute_no_try(tempFilename, drsFilename, storeFilename):
+
+    tab_drs = fits.open(
         drsFilename,
         ignoremissing=True,
         ignore_missing_end=True)
 
-    tabTemp_time = tabTemp[1].data["Time"]
-    tabTemp_temp = tabTemp[1].data["temp"]
-    tabTempDatetime = pd.to_datetime(tabTemp_time * 24 * 3600 * 1e9)
-
-    if tabTemp_temp.shape[1] != NRTEMPSENSOR:
-        errorStr = ("File not used: Just "+str(tabTemp_temp.shape[1]) +
-                    " Temperature Values in File '"+tempFilename+"'")
-        raise Exception(errorStr)
-
     begRun_0 = pd.to_datetime(tabDrs[1].header["RUN0-BEG"])
     endRun_0 = pd.to_datetime(tabDrs[1].header["RUN0-END"])
+    begRun_1 = pd.to_datetime(tabDrs[1].header["RUN1-BEG"])
+    endRun_1 = pd.to_datetime(tabDrs[1].header["RUN1-END"])
+
     baselineMean = tabDrs[1].data["BaselineMean"][0]
     baselineMeanStd = tabDrs[1].data["BaselineRms"][0]
+    gainMean = tabDrs[1].data["GainMean"][0]
+    gainMeanStd = tabDrs[1].data["GainRms"][0]
+
+
 
     baselineMeanNulls = list(np.array(np.where(baselineMean == 0.)[0]))
     if (len(baselineMeanNulls) != 0.):
@@ -188,27 +233,6 @@ def saveTupleOfAttribute_no_try(tempFilename, drsFilename, storeFilename):
                     "' Nulls at Index:\n"+str(baselineMeanStdNulls))
         raise Exception(errorStr)
 
-    indicesRun_0 = np.where((tabTempDatetime > begRun_0) & (tabTempDatetime < endRun_0))[0]
-    timeValuesRun_0 = np.array(tabTemp_time[indicesRun_0])
-    tempValuesRun_0 = np.array(tabTemp_temp[indicesRun_0])
-
-    if(timeValuesRun_0.shape[0] > 1):
-        timeBaseline = np.mean(timeValuesRun_0, dtype="float64")
-    else:
-        timeBaseline = timeValuesRun_0
-
-    if(tempValuesRun_0.shape[0] > 1):
-        tempBaseline = np.mean(tempValuesRun_0, dtype="float64", axis=0)
-        tempStdBaseline = np.std(tempValuesRun_0, dtype="float64", axis=0, ddof=1)
-    else:
-        tempBaseline = tempValuesRun_0
-        tempStdBaseline = np.zeros(tempValuesRun_0.shape[1])
-
-    begRun_1 = pd.to_datetime(tabDrs[1].header["RUN1-BEG"])
-    endRun_1 = pd.to_datetime(tabDrs[1].header["RUN1-END"])
-    gainMean = tabDrs[1].data["GainMean"][0]
-    gainMeanStd = tabDrs[1].data["GainRms"][0]
-
     gainMeanNulls = list(np.array(np.where(gainMean == 0.)[0]))
     if (len(gainMeanNulls) != 0.):
         errorStr = (" File not used: Nulls of gainMean in File '"+str(drsFilename) +
@@ -216,39 +240,30 @@ def saveTupleOfAttribute_no_try(tempFilename, drsFilename, storeFilename):
         raise Exception(errorStr)
 
     gainMeanStdNulls = list(np.array(np.where(gainMeanStd == 0.)[0]))
-    if (len(gainMeanStdNulls) != 0.):
+    if len(gainMeanStdNulls) != 0.:
         errorStr = (" File not used: Nulls of gainMeanStd in File '"+str(drsFilename) +
                     "' Nulls at Index:\n"+str(gainMeanStdNulls))
         raise Exception(errorStr)
 
-    indicesRun_1 = np.where((tabTempDatetime > begRun_1) & (tabTempDatetime < endRun_1))[0]
-    timeValuesRun_1 = np.array(tabTemp_time[indicesRun_1])
-    tempValuesRun_1 = np.array(tabTemp_temp[indicesRun_1])
-
-    if(timeValuesRun_1.shape[0] > 1):
-        timeGain = np.mean(timeValuesRun_1, dtype="float64")
-    else:
-        timeGain = timeValuesRun_1
-
-    if(tempValuesRun_1.shape[0] > 1):
-        tempGain = np.mean(tempValuesRun_1, dtype="float64", axis=0)
-        tempStdGain = np.std(tempValuesRun_1, dtype="float64", axis=0, ddof=1)
-    else:
-        tempGain = tempValuesRun_1
-        tempStdGain = np.zeros(tempValuesRun_1.shape[1])
+    temps_of_runs = read_temps_of_runs(
+        tempFilename,
+        runtimeslist=[
+            (begRun_0, endRun_0),
+            (begRun_1, endRun_1)
+        ])
 
     with h5py.File(storeFilename) as store:
         data = store["TimeBaseline"]
         data.resize((len(data)+1, data.maxshape[1]))
-        data[len(data)-1, :] = timeBaseline
+        data[len(data)-1, :] = temps_of_runs[0]['mean_time']
 
         data = store["TempBaseline"]
         data.resize((len(data)+1, data.maxshape[1]))
-        data[len(data)-1, :] = tempBaseline
+        data[len(data)-1, :] = temps_of_runs[0]['mean_temp']
 
         data = store["TempStdBaseline"]
         data.resize((len(data)+1, data.maxshape[1]))
-        data[len(data)-1, :] = tempStdBaseline
+        data[len(data)-1, :] = temps_of_runs[0]['std_temp']
 
         data = store["BaselineMean"]
         data.resize((len(data)+1, data.maxshape[1]))
@@ -260,15 +275,15 @@ def saveTupleOfAttribute_no_try(tempFilename, drsFilename, storeFilename):
 
         data = store["TimeGain"]
         data.resize((len(data)+1, data.maxshape[1]))
-        data[len(data)-1, :] = timeGain
+        data[len(data)-1, :] = temps_of_runs[1]['mean_time']
 
         data = store["TempGain"]
         data.resize((len(data)+1, data.maxshape[1]))
-        data[len(data)-1, :] = tempGain
+        data[len(data)-1, :] = temps_of_runs[1]['mean_temp']
 
         data = store["TempStdGain"]
         data.resize((len(data)+1, data.maxshape[1]))
-        data[len(data)-1, :] = tempStdGain
+        data[len(data)-1, :] = temps_of_runs[1]['std_temp']
 
         data = store["GainMean"]
         data.resize((len(data)+1, data.maxshape[1]))
