@@ -9,7 +9,7 @@ from astropy.io import fits
 from collections import namedtuple
 
 from fact.credentials import create_factdb_engine
-from .tools import getLinearFitValues
+
 ####################################################################################################
 Constants = namedtuple("Constants", ["nrPix", "nrCap", "nrTempSenor"])
 fact = Constants(nrPix=1440, nrCap=1024, nrTempSenor=160)
