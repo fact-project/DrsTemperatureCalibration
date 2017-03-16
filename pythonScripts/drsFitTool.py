@@ -202,6 +202,19 @@ def read_temps_of_runs(path, runtimeslist):
     return results
 
 
+def check_for_nulls(array, name, path):
+    nulls = np.where(array == 0.)[0]
+    if len(nulls):
+        raise Exception(
+            ("File not used: Nulls of {name} \n" +
+             "in File {path} at index {idx}").format(
+                name=name,
+                path=path,
+                idx=str(nulls)
+            )
+        )
+
+
 def saveTupleOfAttribute_no_try(tempFilename, drsFilename, storeFilename):
 
     tab_drs = fits.open(
@@ -216,29 +229,10 @@ def saveTupleOfAttribute_no_try(tempFilename, drsFilename, storeFilename):
     gainMean = tabDrs[1].data["GainMean"][0]
     gainMeanStd = tabDrs[1].data["GainRms"][0]
 
-    baselineMeanNulls = list(np.array(np.where(baselineMean == 0.)[0]))
-    if (len(baselineMeanNulls) != 0.):
-        errorStr = (" File not used: Nulls of baselineMean in File '"+str(drsFilename) +
-                    "' Nulls at Index:\n"+str(baselineMeanNulls))
-        raise Exception(errorStr)
-
-    baselineMeanStdNulls = list(np.array(np.where(baselineMeanStd == 0.)[0]))
-    if (len(baselineMeanStdNulls) != 0.):
-        errorStr = (" File not used: Nulls of baselineMeanStd in File '"+str(drsFilename) +
-                    "' Nulls at Index:\n"+str(baselineMeanStdNulls))
-        raise Exception(errorStr)
-
-    gainMeanNulls = list(np.array(np.where(gainMean == 0.)[0]))
-    if (len(gainMeanNulls) != 0.):
-        errorStr = (" File not used: Nulls of gainMean in File '"+str(drsFilename) +
-                    "' Nulls at Index:\n"+str(gainMeanNulls))
-        raise Exception(errorStr)
-
-    gainMeanStdNulls = list(np.array(np.where(gainMeanStd == 0.)[0]))
-    if len(gainMeanStdNulls) != 0.:
-        errorStr = (" File not used: Nulls of gainMeanStd in File '"+str(drsFilename) +
-                    "' Nulls at Index:\n"+str(gainMeanStdNulls))
-        raise Exception(errorStr)
+    check_for_nulls(baselineMean, "baselineMean", drsFilename)
+    check_for_nulls(baselineMeanStd, "baselineMeanStd", drsFilename)
+    check_for_nulls(gainMean, "gainMean", drsFilename)
+    check_for_nulls(gainMeanStd, "gainMeanStd", drsFilename)
 
     temps_of_runs = read_temps_of_runs(
         tempFilename,
