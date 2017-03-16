@@ -56,11 +56,6 @@ def main():
     #     fitFilname_="/gpfs0/scratch/schulz/fitValues/fitValuesData_Interval1of1.fits",
     #     storeFilename_="/gpfs0/scratch/schulz/residuen/residuen_Interval1of1.h5")
 
-
-    # writeSecondaryFiles.getMaxTempDiff(
-    #    tempDiffFilename_="../../isdcRoot/gpfs0/scratch/schulz/temperature/tempDiffs2016.fits",
-    #    maxNr_=2)
-
     # plotDrsAttributes.temperatureEraPerPatch(
     #     patchNr_=100,
     #     start_date_="2016-01-01",

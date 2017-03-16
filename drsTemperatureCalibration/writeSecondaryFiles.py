@@ -9,14 +9,6 @@ from fact.credentials import create_factdb_engine
 from .constants import *
 
 
-def getMaxTempDiff(tempDiffFilename_, maxNr_=1):
-    with fits.open(tempDiffFilename_) as store:
-        date = store[1].data["date"]
-        drsRunId = store[1].data["drsRunId"]
-        tempDiffs = store[1].data["maxTempDiff"]
-        tempDiffFlat = sorted(np.concatenate(tempDiffs))[-maxNr_]
-
-
 # TODO FIX Checksum error
 ####################################################################################################
 def temperatureMaxDifferencesPerPatch(storeFilename_, isdcRootPath_, startDate_, endDate_, freq_="D"):
