@@ -19,6 +19,8 @@ from matplotlib import patches
 from matplotlib.cm import hot
 from collections import namedtuple
 
+from fact.credentials import create_factdb_engine
+
 
 def example():
     storeFilename_ = "../plots/temperature/temperatureExampleTrend.pdf"
@@ -255,7 +257,7 @@ def temperatureEraPerPatch(patchNr_, start_date_, end_date_, freq_="D", storeFil
 
 # TODO update ->find drs per database
 ####################################################################################################
-def temperaturePerPatch(patchNr_, date_, storeFilename_=None, dbConfigFile_=None):
+def temperaturePerPatch(patchNr_, date_, storeFilename_=None):
 
     date = pd.to_datetime(date_)
 
@@ -280,7 +282,7 @@ def temperaturePerPatch(patchNr_, date_, storeFilename_=None, dbConfigFile_=None
         plt.plot(datetime, temp, "b.", ms=15, label="Temperature measurement point")
 
         print("Loading Database ...")
-        engine = tool.factDb.getEngine(dbConfigFile_)
+        engine = create_factdb_engine()
         dbTable = pd.read_sql("RunInfo", engine, columns=["fNight", "fRunID",
                                                           "fRunTypeKey", "fDrsStep",
                                                           "fNumEvents"])
@@ -375,9 +377,9 @@ def temperatureMaxDifferencesPerPatch(tempDiffFilename_, patchNr_, nrBins_, stor
 
 
 ####################################################################################################
-# def temperatureMaxDifferencesPerPatch(tempDiffFilename_, patchNr_, nrBins_, storeFilename_=None, dbConfigFile_=""):
+# def temperatureMaxDifferencesPerPatch(tempDiffFilename_, patchNr_, nrBins_, storeFilename_=None):
 #
-#     engine = tool.factDb.getEngine(dbConfigFile_)
+#     engine = create_factdb_engine()
 #     dbTable = pd.read_sql("RunInfo", engine, columns=["fNight", "fRunID",
 #                                                       "fRunTypeKey", "fDrsStep",
 #                                                       "fNumEvents"])

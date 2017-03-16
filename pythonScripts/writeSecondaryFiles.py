@@ -9,6 +9,8 @@ import os
 from astropy.io import fits
 from collections import namedtuple
 
+from fact.credentials import create_factdb_engine
+
 ####################################################################################################
 Constants = namedtuple("Constants", ["nrPix", "nrCap", "nrTempSenor"])
 fact = Constants(nrPix=1440, nrCap=1024, nrTempSenor=160)
@@ -44,7 +46,7 @@ def getLinearFitValues(xValues_, yValues_, yValuesErrors_=[]):
 
 # TODO FIX Checksum error
 ####################################################################################################
-def temperatureMaxDifferencesPerPatch(storeFilename_, isdcRootPath_, startDate_, endDate_, freq_="D", dbConfigFile_=""):
+def temperatureMaxDifferencesPerPatch(storeFilename_, isdcRootPath_, startDate_, endDate_, freq_="D"):
     print(">> Run 'Temperature: MaxDifferencesPerPatch' <<")
 
     if(not os.path.isdir(isdcRootPath_)):
@@ -61,7 +63,7 @@ def temperatureMaxDifferencesPerPatch(storeFilename_, isdcRootPath_, startDate_,
         print("Folder '", storeFilename_[0:storeFilename_.rfind("/")], "' does not exist")
         sys.exit()
 
-    engine = tool.factDb.getEngine(dbConfigFile_)
+    engine = create_factdb_engine
     dbTable = pd.read_sql("RunInfo", engine, columns=["fNight", "fRunID",
                                                       "fRunTypeKey", "fDrsStep",
                                                       "fNumEvents"])
@@ -258,7 +260,7 @@ def residumOfAllCapacitors(drsFilename_, fitFilname_, storeFilename_):
 
 ####################################################################################################
 def drsPedestalRunNoise(isdcRootPath_, sourcePath_, storePath_, factPath_, intervalFitValueDataFilename_,
-                        startDate_, endDate_, freq_="D", dbConfigFile_=""):
+                        startDate_, endDate_, freq_="D"):
     print(">> Run 'DrsPedestalRunNoise' <<")
 
     if(not os.path.isdir(storePath_)):
@@ -270,7 +272,7 @@ def drsPedestalRunNoise(isdcRootPath_, sourcePath_, storePath_, factPath_, inter
         sys.exit()
 
     print("Loading Database ...")
-    engine = tool.factDb.getEngine(dbConfigFile_)
+    engine = create_factdb_engine
     dbTable = pd.read_sql("RunInfo", engine, columns=["fNight", "fRunID",
                                                       "fRunTypeKey", "fDrsStep",
                                                       "fNumEvents", "fBiasVoltageMedian"])

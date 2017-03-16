@@ -1,4 +1,3 @@
-import drsCalibrationTool as tool
 import pandas as pd
 import numpy as np
 import h5py
@@ -8,6 +7,7 @@ import os.path
 import logging
 from astropy.io import fits
 from tqdm import tqdm
+from fact.credentials import create_factdb_engine
 
 NRPIX = 1440
 NRCAP = 1024
@@ -20,7 +20,7 @@ def add_creation_date(storeFilename_):
         store['CreationDate'][0] = [creationDateStr]
 
 
-def searchDrsFiles(storeFilename_, dbConfigFile_=None):
+def searchDrsFiles(storeFilename_):
     '''
         1. search through the fact-database and find all drsFiles
         2. filter them, take just one drsFile per day
@@ -40,7 +40,7 @@ def searchDrsFiles(storeFilename_, dbConfigFile_=None):
             "{}_{:03d}.drs.fits.gz".format(row_.fNight, row_.fRunID),
         )
 
-    engine = tool.factDb.getEngine(dbConfigFile_)
+    engine = create_factdb_engine()
 
     drsInfos = pd.read_sql("RunInfo", engine, columns=["fNight", "fRunID", "fRunTypeKey", "fDrsStep", "fNumEvents"])
     drsFileInfos = drsInfos.query("fRunTypeKey == 2 & fDrsStep == 2 & fNumEvents == 1000").copy()
