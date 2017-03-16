@@ -147,7 +147,6 @@ def saveDrsAttributes(drsFileList_, storeFilename_):
 def saveTupleOfAttribute(tempFilename, drsFilename, storeFilename):
 
     loggingFlag = True
-    errorFlag = False
     try:
         tabTemp = fits.open(
             tempFilename,
@@ -174,7 +173,6 @@ def saveTupleOfAttribute(tempFilename, drsFilename, storeFilename):
         return
 
     if(tabTemp_temp is not None and tabTemp_temp.shape[1] != NRTEMPSENSOR):
-        errorFlag = True
         if(loggingFlag):
             errorStr = ("File not used: Just "+str(tabTemp_temp.shape[1]) +
                         " Temperature Values in File '"+tempFilename+"'")
@@ -196,43 +194,42 @@ def saveTupleOfAttribute(tempFilename, drsFilename, storeFilename):
         logging.exception(" In File:"+drsFilename)
         return
 
-    if not errorFlag:
-        baselineMean = tabDrs[1].data["BaselineMean"][0]
-        baselineMeanStd = tabDrs[1].data["BaselineRms"][0]
+    baselineMean = tabDrs[1].data["BaselineMean"][0]
+    baselineMeanStd = tabDrs[1].data["BaselineRms"][0]
 
-        baselineMeanNulls = list(np.array(np.where(baselineMean == 0.)[0]))
-        if (len(baselineMeanNulls) != 0.):
-            errorFlag = True
-            if(loggingFlag):
-                errorStr = (" File not used: Nulls of baselineMean in File '"+str(drsFilename) +
-                            "' Nulls at Index:\n"+str(baselineMeanNulls))
-                # print(errorStr)
-                logging.error(errorStr)
+    baselineMeanNulls = list(np.array(np.where(baselineMean == 0.)[0]))
+    if (len(baselineMeanNulls) != 0.):
+        if(loggingFlag):
+            errorStr = (" File not used: Nulls of baselineMean in File '"+str(drsFilename) +
+                        "' Nulls at Index:\n"+str(baselineMeanNulls))
+            # print(errorStr)
+            logging.error(errorStr)
+        return
 
-        baselineMeanStdNulls = list(np.array(np.where(baselineMeanStd == 0.)[0]))
-        if (len(baselineMeanStdNulls) != 0.):
-            errorFlag = True
-            if(loggingFlag):
-                errorStr = (" File not used: Nulls of baselineMeanStd in File '"+str(drsFilename) +
-                            "' Nulls at Index:\n"+str(baselineMeanStdNulls))
-                # print(errorStr)
-                logging.error(errorStr)
+    baselineMeanStdNulls = list(np.array(np.where(baselineMeanStd == 0.)[0]))
+    if (len(baselineMeanStdNulls) != 0.):
+        if(loggingFlag):
+            errorStr = (" File not used: Nulls of baselineMeanStd in File '"+str(drsFilename) +
+                        "' Nulls at Index:\n"+str(baselineMeanStdNulls))
+            # print(errorStr)
+            logging.error(errorStr)
+        return
 
-        indicesRun_0 = np.where((tabTempDatetime > begRun_0) & (tabTempDatetime < endRun_0))[0]
-        timeValuesRun_0 = np.array(tabTemp_time[indicesRun_0])
-        tempValuesRun_0 = np.array(tabTemp_temp[indicesRun_0])
+    indicesRun_0 = np.where((tabTempDatetime > begRun_0) & (tabTempDatetime < endRun_0))[0]
+    timeValuesRun_0 = np.array(tabTemp_time[indicesRun_0])
+    tempValuesRun_0 = np.array(tabTemp_temp[indicesRun_0])
 
-        if(timeValuesRun_0.shape[0] > 1):
-            timeBaseline = np.mean(timeValuesRun_0, dtype="float64")
-        else:
-            timeBaseline = timeValuesRun_0
+    if(timeValuesRun_0.shape[0] > 1):
+        timeBaseline = np.mean(timeValuesRun_0, dtype="float64")
+    else:
+        timeBaseline = timeValuesRun_0
 
-        if(tempValuesRun_0.shape[0] > 1):
-            tempBaseline = np.mean(tempValuesRun_0, dtype="float64", axis=0)
-            tempStdBaseline = np.std(tempValuesRun_0, dtype="float64", axis=0, ddof=1)
-        else:
-            tempBaseline = tempValuesRun_0
-            tempStdBaseline = np.zeros(tempValuesRun_0.shape[1])
+    if(tempValuesRun_0.shape[0] > 1):
+        tempBaseline = np.mean(tempValuesRun_0, dtype="float64", axis=0)
+        tempStdBaseline = np.std(tempValuesRun_0, dtype="float64", axis=0, ddof=1)
+    else:
+        tempBaseline = tempValuesRun_0
+        tempStdBaseline = np.zeros(tempValuesRun_0.shape[1])
 
     begRun_1 = None
     endRun_1 = None
@@ -248,84 +245,83 @@ def saveTupleOfAttribute(tempFilename, drsFilename, storeFilename):
         logging.exception(" In File:"+drsFilename)
         return
 
-    if not errorFlag:
-        gainMean = tabDrs[1].data["GainMean"][0]
-        gainMeanStd = tabDrs[1].data["GainRms"][0]
+    gainMean = tabDrs[1].data["GainMean"][0]
+    gainMeanStd = tabDrs[1].data["GainRms"][0]
 
-        gainMeanNulls = list(np.array(np.where(gainMean == 0.)[0]))
-        if (len(gainMeanNulls) != 0.):
-            errorFlag = True
-            if(loggingFlag):
-                errorStr = (" File not used: Nulls of gainMean in File '"+str(drsFilename) +
-                            "' Nulls at Index:\n"+str(gainMeanNulls))
-                # print(errorStr)
-                logging.error(errorStr)
+    gainMeanNulls = list(np.array(np.where(gainMean == 0.)[0]))
+    if (len(gainMeanNulls) != 0.):
+        if(loggingFlag):
+            errorStr = (" File not used: Nulls of gainMean in File '"+str(drsFilename) +
+                        "' Nulls at Index:\n"+str(gainMeanNulls))
+            # print(errorStr)
+            logging.error(errorStr)
+        return
 
-        gainMeanStdNulls = list(np.array(np.where(gainMeanStd == 0.)[0]))
-        if (len(gainMeanStdNulls) != 0.):
-            errorFlag = True
-            if(loggingFlag):
-                errorStr = (" File not used: Nulls of gainMeanStd in File '"+str(drsFilename) +
-                            "' Nulls at Index:\n"+str(gainMeanStdNulls))
-                # print(errorStr)
-                logging.error(errorStr)
+    gainMeanStdNulls = list(np.array(np.where(gainMeanStd == 0.)[0]))
+    if (len(gainMeanStdNulls) != 0.):
+        if(loggingFlag):
+            errorStr = (" File not used: Nulls of gainMeanStd in File '"+str(drsFilename) +
+                        "' Nulls at Index:\n"+str(gainMeanStdNulls))
+            # print(errorStr)
+            logging.error(errorStr)
+        return
 
-        indicesRun_1 = np.where((tabTempDatetime > begRun_1) & (tabTempDatetime < endRun_1))[0]
-        timeValuesRun_1 = np.array(tabTemp_time[indicesRun_1])
-        tempValuesRun_1 = np.array(tabTemp_temp[indicesRun_1])
+    indicesRun_1 = np.where((tabTempDatetime > begRun_1) & (tabTempDatetime < endRun_1))[0]
+    timeValuesRun_1 = np.array(tabTemp_time[indicesRun_1])
+    tempValuesRun_1 = np.array(tabTemp_temp[indicesRun_1])
 
-        if(timeValuesRun_1.shape[0] > 1):
-            timeGain = np.mean(timeValuesRun_1, dtype="float64")
-        else:
-            timeGain = timeValuesRun_1
+    if(timeValuesRun_1.shape[0] > 1):
+        timeGain = np.mean(timeValuesRun_1, dtype="float64")
+    else:
+        timeGain = timeValuesRun_1
 
-        if(tempValuesRun_1.shape[0] > 1):
-            tempGain = np.mean(tempValuesRun_1, dtype="float64", axis=0)
-            tempStdGain = np.std(tempValuesRun_1, dtype="float64", axis=0, ddof=1)
-        else:
-            tempGain = tempValuesRun_1
-            tempStdGain = np.zeros(tempValuesRun_1.shape[1])
+    if(tempValuesRun_1.shape[0] > 1):
+        tempGain = np.mean(tempValuesRun_1, dtype="float64", axis=0)
+        tempStdGain = np.std(tempValuesRun_1, dtype="float64", axis=0, ddof=1)
+    else:
+        tempGain = tempValuesRun_1
+        tempStdGain = np.zeros(tempValuesRun_1.shape[1])
 
-        with h5py.File(storeFilename) as store:
-            data = store["TimeBaseline"]
-            data.resize((len(data)+1, data.maxshape[1]))
-            data[len(data)-1, :] = timeBaseline
+    with h5py.File(storeFilename) as store:
+        data = store["TimeBaseline"]
+        data.resize((len(data)+1, data.maxshape[1]))
+        data[len(data)-1, :] = timeBaseline
 
-            data = store["TempBaseline"]
-            data.resize((len(data)+1, data.maxshape[1]))
-            data[len(data)-1, :] = tempBaseline
+        data = store["TempBaseline"]
+        data.resize((len(data)+1, data.maxshape[1]))
+        data[len(data)-1, :] = tempBaseline
 
-            data = store["TempStdBaseline"]
-            data.resize((len(data)+1, data.maxshape[1]))
-            data[len(data)-1, :] = tempStdBaseline
+        data = store["TempStdBaseline"]
+        data.resize((len(data)+1, data.maxshape[1]))
+        data[len(data)-1, :] = tempStdBaseline
 
-            data = store["BaselineMean"]
-            data.resize((len(data)+1, data.maxshape[1]))
-            data[len(data)-1, :] = baselineMean
+        data = store["BaselineMean"]
+        data.resize((len(data)+1, data.maxshape[1]))
+        data[len(data)-1, :] = baselineMean
 
-            data = store["BaselineMeanStd"]
-            data.resize((len(data)+1, data.maxshape[1]))
-            data[len(data)-1, :] = baselineMeanStd
+        data = store["BaselineMeanStd"]
+        data.resize((len(data)+1, data.maxshape[1]))
+        data[len(data)-1, :] = baselineMeanStd
 
-            data = store["TimeGain"]
-            data.resize((len(data)+1, data.maxshape[1]))
-            data[len(data)-1, :] = timeGain
+        data = store["TimeGain"]
+        data.resize((len(data)+1, data.maxshape[1]))
+        data[len(data)-1, :] = timeGain
 
-            data = store["TempGain"]
-            data.resize((len(data)+1, data.maxshape[1]))
-            data[len(data)-1, :] = tempGain
+        data = store["TempGain"]
+        data.resize((len(data)+1, data.maxshape[1]))
+        data[len(data)-1, :] = tempGain
 
-            data = store["TempStdGain"]
-            data.resize((len(data)+1, data.maxshape[1]))
-            data[len(data)-1, :] = tempStdGain
+        data = store["TempStdGain"]
+        data.resize((len(data)+1, data.maxshape[1]))
+        data[len(data)-1, :] = tempStdGain
 
-            data = store["GainMean"]
-            data.resize((len(data)+1, data.maxshape[1]))
-            data[len(data)-1, :] = gainMean
+        data = store["GainMean"]
+        data.resize((len(data)+1, data.maxshape[1]))
+        data[len(data)-1, :] = gainMean
 
-            data = store["GainMeanStd"]
-            data.resize((len(data)+1, data.maxshape[1]))
-            data[len(data)-1, :] = gainMeanStd
+        data = store["GainMeanStd"]
+        data.resize((len(data)+1, data.maxshape[1]))
+        data[len(data)-1, :] = gainMeanStd
 
 
 ####################################################################################################
