@@ -9,7 +9,7 @@ from astropy.io import fits
 from collections import namedtuple
 
 from fact.credentials import create_factdb_engine
-
+from .tools import getLinearFitValues
 ####################################################################################################
 Constants = namedtuple("Constants", ["nrPix", "nrCap", "nrTempSenor"])
 fact = Constants(nrPix=1440, nrCap=1024, nrTempSenor=160)
@@ -22,25 +22,6 @@ def getMaxTempDiff(tempDiffFilename_, maxNr_=1):
         drsRunId = store[1].data["drsRunId"]
         tempDiffs = store[1].data["maxTempDiff"]
         tempDiffFlat = sorted(np.concatenate(tempDiffs))[-maxNr_]
-
-
-####################################################################################################
-def getLinearFitValues(xValues_, yValues_, yValuesErrors_=[]):
-    yWeighting = 1/pow(yValuesErrors_, 2)
-
-    S_1 = np.sum(yWeighting)
-    S_x = np.sum(yWeighting*xValues_)
-    S_xx = np.sum(yWeighting*pow(xValues_, 2))
-
-    S_y = np.sum(yWeighting*yValues_)
-    S_xy = np.sum(yWeighting*xValues_*yValues_)
-
-    D = S_1*S_xx - pow(S_x, 2)
-
-    var = [(-S_x*S_y + S_1*S_xy)*(1/D), (S_xx*S_y - S_x*S_xy)*(1/D)]
-    cov = [[S_1/D, -S_x/D], [-S_x/D, S_xx/D]]
-
-    return(var, cov)
 
 
 # TODO FIX Checksum error
