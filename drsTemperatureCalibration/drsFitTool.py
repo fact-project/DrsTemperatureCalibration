@@ -13,13 +13,14 @@ from .tools import getLinearFitValues
 from .constants import NRPIX, NRCAP, NRTEMPSENSOR
 
 
-def searchDrsFiles(storeFilename_):
+def search_drs_files(storeFilename_):
     '''
         1. search through the fact-database and find all drsFiles
         2. filter them, take just one drsFile per day
     '''
     print(">> Run 'SearchDrsFiles' <<")
 
+    # TODO check safety stuff. maybe remove
     if(not os.path.isdir(storeFilename_[0:storeFilename_.rfind("/")])):
         print("Folder '", storeFilename_[0:storeFilename_.rfind("/")], "' does not exist")
         sys.exit()
@@ -33,10 +34,16 @@ def searchDrsFiles(storeFilename_):
             "{}_{:03d}.drs.fits.gz".format(row_.fNight, row_.fRunID),
         )
 
-    engine = create_factdb_engine()
-
-    drsInfos = pd.read_sql("RunInfo", engine, columns=["fNight", "fRunID", "fRunTypeKey", "fDrsStep", "fNumEvents"])
-    drsFileInfos = drsInfos.query("fRunTypeKey == 2 & fDrsStep == 2 & fNumEvents == 1000").copy()
+    drsInfos = pd.read_sql(
+                   "RunInfo",
+                   create_factdb_engine(),
+                   columns=[
+                       "fNight", "fRunID",
+                       "fRunTypeKey", "fDrsStep",
+                       "fNumEvents"])
+    drsFileInfos = drsInfos.query("fRunTypeKey == 2 &" +
+                                  "fDrsStep == 2 &" +
+                                  "fNumEvents == 1000").copy()
     # fNumEvents == 1000 prevent for unfinished/broken files
     drsFileInfos["date"] = pd.to_datetime(drsFileInfos.fNight.astype(str), format="%Y%m%d")
 
@@ -70,7 +77,7 @@ def searchDrsFiles(storeFilename_):
 ####################################################################################################
 ####################################################################################################
 
-def saveDrsAttributes(drsFileList_, storeFilename_):
+def save_drs_attributes(drsFileList_, storeFilename_):
     '''
         save Baseline and Gain of all drsfiles of the drsFileList
         together with the mean of Time and Temperature of taking
@@ -78,9 +85,10 @@ def saveDrsAttributes(drsFileList_, storeFilename_):
     '''
     print(">> Run 'SaveDrsAttributes' <<")
 
+    # TODO check safety stuff. maybe remove
     if(os.path.isfile(storeFilename_)):
-        userInput = input("File ’"+str(storeFilename_)+"’ allready exist.\n" +
-                          " Type ’y’ to overwrite File\nYour input: ")
+        userInput = input("File '"+str(storeFilename_)+"' allready exist.\n" +
+                          " Type 'y' to overwrite File\nYour input: ")
         if(userInput != 'y'):
             sys.exit()
 
@@ -93,6 +101,7 @@ def saveDrsAttributes(drsFileList_, storeFilename_):
 
     nrFactValues = NRPIX*NRCAP
 
+    # add columns to h5py table
     with h5py.File(storeFilename_, 'w') as hf:
         hf.create_dataset('CreationDate', (1, 1), dtype='S19', maxshape=(1, 1),
                           compression="gzip", compression_opts=9, fletcher32=True)
@@ -119,6 +128,7 @@ def saveDrsAttributes(drsFileList_, storeFilename_):
         hf.create_dataset("GainMeanStd",     (0, nrFactValues), maxshape=(None, nrFactValues),
                           compression="gzip", compression_opts=9, fletcher32=True)
 
+    # fill h5py table
     drsFileList = open(drsFileList_).read().splitlines()
     for drsFilename in tqdm(drsFileList):
         drsFilename = drsFilename.strip("\n")
@@ -128,8 +138,9 @@ def saveDrsAttributes(drsFileList_, storeFilename_):
             path_part)
 
         if(os.path.isfile(drsFilename) and os.path.isfile(tempFilename)):
-            saveTupleOfAttribute(tempFilename, drsFilename, storeFilename_)
+            try_to_save_tuple_of_attribute(tempFilename, drsFilename, storeFilename_)
 
+    # update h5py creationDate
     creationDateStr = pd.datetime.now().strftime('%Y-%m-%d %H:%M:%S').encode("UTF-8", "ignore")
     with h5py.File(storeFilename_) as store:
         store['CreationDate'][0] = [creationDateStr]
@@ -137,12 +148,63 @@ def saveDrsAttributes(drsFileList_, storeFilename_):
     print(">> Finished 'SaveDrsAttributes' <<")
 
 
-def saveTupleOfAttribute(tempFilename, drsFilename, storeFilename):
+def try_to_save_tuple_of_attribute(tempFilename_, drsFilename_, storeFilename_):
     try:
-        saveTupleOfAttribute_no_try(tempFilename, drsFilename, storeFilename)
+        save_tuple_of_attribute_if_possible(tempFilename_, drsFilename_, storeFilename_)
     except:
         logging.exception()
         return
+
+
+def save_tuple_of_attribute_if_possible(tempFilename_, drsFilename_, storeFilename_):
+
+    tabDrs = fits.open(
+        drsFilename_,
+        ignoremissing=True,
+        ignore_missing_end=True)
+    header = tabDrs[1].header
+    bintable = tabDrs[1].data
+
+    baselineMean = bintable["BaselineMean"][0]
+    baselineMeanStd = bintable["BaselineRms"][0]
+    gainMean = bintable["GainMean"][0]
+    gainMeanStd = bintable["GainRms"][0]
+
+    check_for_nulls(baselineMean, "baselineMean", drsFilename_)
+    check_for_nulls(baselineMeanStd, "baselineMeanStd", drsFilename_)
+    check_for_nulls(gainMean, "gainMean", drsFilename_)
+    check_for_nulls(gainMeanStd, "gainMeanStd", drsFilename_)
+
+    temps_of_runs = read_temps_of_runs(
+        tempFilename_,
+        runtimeslist=[
+            (
+                pd.to_datetime(header["RUN0-BEG"]),
+                pd.to_datetime(header["RUN0-END"])
+            ),
+            (
+                pd.to_datetime(header["RUN1-BEG"]),
+                pd.to_datetime(header["RUN1-END"])
+            ),
+        ])
+
+    with h5py.File(storeFilename_) as table:
+        add_value_to_h5py_table(table, "TimeBaseline", temps_of_runs[0]['mean_time'])
+        add_value_to_h5py_table(table, "TempBaseline", temps_of_runs[0]['mean_temp'])
+        add_value_to_h5py_table(table, "TempStdBaseline", temps_of_runs[0]['std_temp'])
+        add_value_to_h5py_table(table, "BaselineMean", baselineMean)
+        add_value_to_h5py_table(table, "BaselineMeanStd", baselineMeanStd)
+        add_value_to_h5py_table(table, "TimeGain", temps_of_runs[1]['mean_time'])
+        add_value_to_h5py_table(table, "TempGain", temps_of_runs[1]['mean_temp'])
+        add_value_to_h5py_table(table, "TempStdGain", temps_of_runs[1]['std_temp'])
+        add_value_to_h5py_table(table, "GainMean", gainMean)
+        add_value_to_h5py_table(table, "GainMeanStd", gainMeanStd)
+
+
+def add_value_to_h5py_table(h5pyTable_, columnName_, value_):
+    data = h5pyTable_[columnName_]
+    data.resize((len(data)+1, data.maxshape[1]))
+    data[len(data)-1, :] = value_
 
 
 def read_temps_of_runs(path, runtimeslist):
@@ -209,64 +271,15 @@ def check_for_nulls(array, name, path):
         )
 
 
-def saveTupleOfAttribute_no_try(tempFilename, drsFilename, storeFilename):
-
-    tabDrs = fits.open(
-        drsFilename,
-        ignoremissing=True,
-        ignore_missing_end=True)
-    header = tabDrs[1].header
-    bintable = tabDrs[1].data
-
-    baselineMean = tabDrs[1].data["BaselineMean"][0]
-    baselineMeanStd = tabDrs[1].data["BaselineRms"][0]
-    gainMean = tabDrs[1].data["GainMean"][0]
-    gainMeanStd = tabDrs[1].data["GainRms"][0]
-
-    check_for_nulls(baselineMean, "baselineMean", drsFilename)
-    check_for_nulls(baselineMeanStd, "baselineMeanStd", drsFilename)
-    check_for_nulls(gainMean, "gainMean", drsFilename)
-    check_for_nulls(gainMeanStd, "gainMeanStd", drsFilename)
-
-    temps_of_runs = read_temps_of_runs(
-        tempFilename,
-        runtimeslist=[
-            (
-                pd.to_datetime(header["RUN0-BEG"]),
-                pd.to_datetime(header["RUN0-END"])
-            ),
-            (
-                pd.to_datetime(header["RUN1-BEG"]),
-                pd.to_datetime(header["RUN1-END"])
-            ),
-        ])
-
-    def my_store(store, name, what):
-        data = store[name]
-        data.resize((len(data)+1, data.maxshape[1]))
-        data[len(data)-1, :] = what
-
-    with h5py.File(storeFilename) as store:
-        my_store(store, "TimeBaseline", temps_of_runs[0]['mean_time'])
-        my_store(store, "TempBaseline", temps_of_runs[0]['mean_temp'])
-        my_store(store, "TempStdBaseline", temps_of_runs[0]['std_temp'])
-        my_store(store, "BaselineMean", baselineMean)
-        my_store(store, "BaselineMeanStd", baselineMeanStd)
-        my_store(store, "TimeGain", temps_of_runs[1]['mean_time'])
-        my_store(store, "TempGain", temps_of_runs[1]['mean_temp'])
-        my_store(store, "TempStdGain", temps_of_runs[1]['std_temp'])
-        my_store(store, "GainMean", gainMean)
-        my_store(store, "GainMeanStd", gainMeanStd)
-
 ####################################################################################################
 ####################################################################################################
 # ##############                           saveFitValues                            ############## #
 ####################################################################################################
 ####################################################################################################
 
-def saveFitValues(sourceFilename_, storeFilename_,
-                  cutOffErrorFactorBaseline_, cutOffErrorFactorGain_,
-                  firstDate_=None, lastDate_=None):
+def save_fit_values(sourceFilename_, storeFilename_,
+                    cutOffErrorFactorBaseline_, cutOffErrorFactorGain_,
+                    firstDate_=None, lastDate_=None):
     '''
         Calculate the linear fitvalues of Basline and Gain of the .h5 source
         and store them into a .fits File
@@ -277,9 +290,10 @@ def saveFitValues(sourceFilename_, storeFilename_,
 
     print(">> Run 'SaveFitValues' <<")
 
+    # TODO check safety stuff. maybe remove
     if(os.path.isfile(storeFilename_)):
-        userInput = input("File ’"+str(storeFilename_)+"’ allready exist.\n" +
-                          " Type ’y’ to overwrite File\nYour input: ")
+        userInput = input("File '"+str(storeFilename_)+"' allready exist.\n" +
+                          " Type 'y' to overwrite File\nYour input: ")
         if(userInput != 'y'):
             sys.exit()
 
@@ -344,11 +358,7 @@ def saveFitValues(sourceFilename_, storeFilename_,
     print("Calculate fitvalues for '"+str(NRPIX)+"' Pixel \n" +
           "for the period from "+str(firstDate)+" until "+str(lastDate))
 
-    for pixelNr in range(NRPIX):
-
-        if(((pixelNr/NRPIX*100) % 1) < (((pixelNr-1)/NRPIX*100) % 1) and
-           ((pixelNr/NRPIX*100) % 1) < (((pixelNr+1)/NRPIX*100) % 1)):
-            print("PixelNr:", str('{:4d}'.format(pixelNr+1)), ":", '{:2d}'.format(int(pixelNr/NRPIX*100)), '%')
+    for pixelNr in tqdm(range(NRPIX)):
 
         tempBaseline = tempBaselineArray[:, int(pixelNr/9)]
         tempGain = tempGainArray[:, int(pixelNr/9)]
