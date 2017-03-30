@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-import h5py
 import sys
 import os
 import os.path
@@ -10,6 +9,7 @@ from tqdm import tqdm
 from fact.credentials import create_factdb_engine
 from .tools import getLinearFitValues
 from .constants import *
+from .my_h5py import h5py
 
 
 def add_creation_date(storeFilename_):
@@ -98,32 +98,18 @@ def saveDrsAttributes(drsFileList_, storeFilename_):
 
     nrFactValues = NRPIX*NRCAP
 
-    def create_my_dataset(file, name, shape=None, maxshape=None, dtype=None):
-        if maxshape is None:
-            maxshape = tuple(x if x!=0 else None for x in shape)
-
-        file.create_dataset(
-            name,
-            shape,
-            dtype=dtype,
-            maxshape=maxshape,
-            compression="gzip",
-            compression_opts=9,
-            fletcher32=True,
-        )
-
     with h5py.File(storeFilename_, 'w') as hf:
-        create_my_dataset(hf, 'CreationDate',    (1, 1), dtype='S19')
-        create_my_dataset(hf, "TimeBaseline",    (0, 1))
-        create_my_dataset(hf, "TempBaseline",    (0, NRTEMPSENSOR))
-        create_my_dataset(hf, "TempStdBaseline", (0, NRTEMPSENSOR))
-        create_my_dataset(hf, "BaselineMean",    (0, nrFactValues))
-        create_my_dataset(hf, "BaselineMeanStd", (0, nrFactValues))
-        create_my_dataset(hf, "TimeGain",        (0, 1))
-        create_my_dataset(hf, "TempGain",        (0, NRTEMPSENSOR))
-        create_my_dataset(hf, "TempStdGain",     (0, NRTEMPSENSOR))
-        create_my_dataset(hf, "GainMean",        (0, nrFactValues))
-        create_my_dataset(hf, "GainMeanStd",     (0, nrFactValues))
+        hf.create_my_dataset('CreationDate',    (1, 1), dtype='S19')
+        hf.create_my_dataset("TimeBaseline",    (0, 1))
+        hf.create_my_dataset("TempBaseline",    (0, NRTEMPSENSOR))
+        hf.create_my_dataset("TempStdBaseline", (0, NRTEMPSENSOR))
+        hf.create_my_dataset("BaselineMean",    (0, nrFactValues))
+        hf.create_my_dataset("BaselineMeanStd", (0, nrFactValues))
+        hf.create_my_dataset("TimeGain",        (0, 1))
+        hf.create_my_dataset("TempGain",        (0, NRTEMPSENSOR))
+        hf.create_my_dataset("TempStdGain",     (0, NRTEMPSENSOR))
+        hf.create_my_dataset("GainMean",        (0, nrFactValues))
+        hf.create_my_dataset("GainMeanStd",     (0, nrFactValues))
 
     drsFileList_ = open(drsFileList_).read().splitlines()
     for drsFilename in tqdm(drsFileList):
