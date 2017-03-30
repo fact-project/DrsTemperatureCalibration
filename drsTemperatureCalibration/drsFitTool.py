@@ -3,19 +3,14 @@ import numpy as np
 import h5py
 import sys
 import os
-import os.path
 import logging
+
 from astropy.io import fits
 from tqdm import tqdm
 from fact.credentials import create_factdb_engine
+
 from .tools import getLinearFitValues
-from .constants import *
-
-
-def add_creation_date(storeFilename_):
-    creationDateStr = pd.datetime.now().strftime('%Y-%m-%d %H:%M:%S').encode("UTF-8", "ignore")
-    with h5py.File(storeFilename_) as store:
-        store['CreationDate'][0] = [creationDateStr]
+from .constants import NRPIX, NRCAP, NRTEMPSENSOR
 
 
 def searchDrsFiles(storeFilename_):
@@ -98,34 +93,33 @@ def saveDrsAttributes(drsFileList_, storeFilename_):
 
     nrFactValues = NRPIX*NRCAP
 
-    def create_my_dataset(file, name, shape=None, maxshape=None, dtype=None):
-        if maxshape is None:
-            maxshape = tuple(x if x!=0 else None for x in shape)
-
-        file.create_dataset(
-            name,
-            shape,
-            dtype=dtype,
-            maxshape=maxshape,
-            compression="gzip",
-            compression_opts=9,
-            fletcher32=True,
-        )
-
     with h5py.File(storeFilename_, 'w') as hf:
-        create_my_dataset(hf, 'CreationDate',    (1, 1), dtype='S19')
-        create_my_dataset(hf, "TimeBaseline",    (0, 1))
-        create_my_dataset(hf, "TempBaseline",    (0, NRTEMPSENSOR))
-        create_my_dataset(hf, "TempStdBaseline", (0, NRTEMPSENSOR))
-        create_my_dataset(hf, "BaselineMean",    (0, nrFactValues))
-        create_my_dataset(hf, "BaselineMeanStd", (0, nrFactValues))
-        create_my_dataset(hf, "TimeGain",        (0, 1))
-        create_my_dataset(hf, "TempGain",        (0, NRTEMPSENSOR))
-        create_my_dataset(hf, "TempStdGain",     (0, NRTEMPSENSOR))
-        create_my_dataset(hf, "GainMean",        (0, nrFactValues))
-        create_my_dataset(hf, "GainMeanStd",     (0, nrFactValues))
+        hf.create_dataset('CreationDate', (1, 1), dtype='S19', maxshape=(1, 1),
+                          compression="gzip", compression_opts=9, fletcher32=True)
 
-    drsFileList_ = open(drsFileList_).read().splitlines()
+        hf.create_dataset("TimeBaseline",    (0, 1), maxshape=(None, 1),
+                          compression="gzip", compression_opts=9, fletcher32=True)
+        hf.create_dataset("TempBaseline",    (0, NRTEMPSENSOR), maxshape=(None, NRTEMPSENSOR),
+                          compression="gzip", compression_opts=9, fletcher32=True)
+        hf.create_dataset("TempStdBaseline", (0, NRTEMPSENSOR), maxshape=(None, NRTEMPSENSOR),
+                          compression="gzip", compression_opts=9, fletcher32=True)
+        hf.create_dataset("BaselineMean",    (0, nrFactValues), maxshape=(None, nrFactValues),
+                          compression="gzip", compression_opts=9, fletcher32=True)
+        hf.create_dataset("BaselineMeanStd", (0, nrFactValues), maxshape=(None, nrFactValues),
+                          compression="gzip", compression_opts=9, fletcher32=True)
+
+        hf.create_dataset("TimeGain",        (0, 1), maxshape=(None, 1),
+                          compression="gzip", compression_opts=9, fletcher32=True)
+        hf.create_dataset("TempGain",        (0, NRTEMPSENSOR), maxshape=(None, NRTEMPSENSOR),
+                          compression="gzip", compression_opts=9, fletcher32=True)
+        hf.create_dataset("TempStdGain",     (0, NRTEMPSENSOR), maxshape=(None, NRTEMPSENSOR),
+                          compression="gzip", compression_opts=9, fletcher32=True)
+        hf.create_dataset("GainMean",        (0, nrFactValues), maxshape=(None, nrFactValues),
+                          compression="gzip", compression_opts=9, fletcher32=True)
+        hf.create_dataset("GainMeanStd",     (0, nrFactValues), maxshape=(None, nrFactValues),
+                          compression="gzip", compression_opts=9, fletcher32=True)
+
+    drsFileList = open(drsFileList_).read().splitlines()
     for drsFilename in tqdm(drsFileList):
         drsFilename = drsFilename.strip("\n")
 
@@ -136,7 +130,9 @@ def saveDrsAttributes(drsFileList_, storeFilename_):
         if(os.path.isfile(drsFilename) and os.path.isfile(tempFilename)):
             saveTupleOfAttribute(tempFilename, drsFilename, storeFilename_)
 
-    add_creation_date(storeFilename_)
+    creationDateStr = pd.datetime.now().strftime('%Y-%m-%d %H:%M:%S').encode("UTF-8", "ignore")
+    with h5py.File(storeFilename_) as store:
+        store['CreationDate'][0] = [creationDateStr]
 
     print(">> Finished 'SaveDrsAttributes' <<")
 
@@ -215,7 +211,7 @@ def check_for_nulls(array, name, path):
 
 def saveTupleOfAttribute_no_try(tempFilename, drsFilename, storeFilename):
 
-    tab_drs = fits.open(
+    tabDrs = fits.open(
         drsFilename,
         ignoremissing=True,
         ignore_missing_end=True)
