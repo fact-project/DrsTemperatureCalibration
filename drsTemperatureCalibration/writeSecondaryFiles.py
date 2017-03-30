@@ -1,47 +1,12 @@
-import drsCalibrationTool as tool
 import subprocess as sp
 import pandas as pd
 import numpy as np
 import h5py
 import sys
 import os
-
 from astropy.io import fits
-from collections import namedtuple
-
 from fact.credentials import create_factdb_engine
-
-####################################################################################################
-Constants = namedtuple("Constants", ["nrPix", "nrCap", "nrTempSenor"])
-fact = Constants(nrPix=1440, nrCap=1024, nrTempSenor=160)
-
-
-####################################################################################################
-def getMaxTempDiff(tempDiffFilename_, maxNr_=1):
-    with fits.open(tempDiffFilename_) as store:
-        date = store[1].data["date"]
-        drsRunId = store[1].data["drsRunId"]
-        tempDiffs = store[1].data["maxTempDiff"]
-        tempDiffFlat = sorted(np.concatenate(tempDiffs))[-maxNr_]
-
-
-####################################################################################################
-def getLinearFitValues(xValues_, yValues_, yValuesErrors_=[]):
-    yWeighting = 1/pow(yValuesErrors_, 2)
-
-    S_1 = np.sum(yWeighting)
-    S_x = np.sum(yWeighting*xValues_)
-    S_xx = np.sum(yWeighting*pow(xValues_, 2))
-
-    S_y = np.sum(yWeighting*yValues_)
-    S_xy = np.sum(yWeighting*xValues_*yValues_)
-
-    D = S_1*S_xx - pow(S_x, 2)
-
-    var = [(-S_x*S_y + S_1*S_xy)*(1/D), (S_xx*S_y - S_x*S_xy)*(1/D)]
-    cov = [[S_1/D, -S_x/D], [-S_x/D, S_xx/D]]
-
-    return(var, cov)
+from .constants import *
 
 
 # TODO FIX Checksum error
@@ -210,10 +175,10 @@ def residumOfAllCapacitors(drsFilename_, fitFilname_, storeFilename_):
         hf.create_dataset("Interval", (2, 1), dtype='S19', data=interval, maxshape=(2, 1),
                           compression="gzip", compression_opts=9, fletcher32=True)
 
-        hf.create_dataset("ResiduenBaseline", (0, 0), maxshape=(fact.nrPix*fact.nrCap, None),
+        hf.create_dataset("ResiduenBaseline", (0, 0), maxshape=(NRPIX*NRCAP, None),
                           compression="gzip", compression_opts=9, fletcher32=True)
 
-        hf.create_dataset("ResiduenGain",     (0, 0), maxshape=(fact.nrPix*fact.nrCap, None),
+        hf.create_dataset("ResiduenGain",     (0, 0), maxshape=(NRPIX*NRCAP, None),
                           compression="gzip", compression_opts=9, fletcher32=True)
 
     drsTypes = ["Baseline", "Gain"]
@@ -229,26 +194,26 @@ def residumOfAllCapacitors(drsFilename_, fitFilname_, storeFilename_):
 
         with h5py.File(storeFilename_) as store:
             data = store["Residuen"+valueType]
-            data.resize((fact.nrPix*fact.nrCap, drsValue.shape[0]))
+            data.resize((NRPIX*NRCAP, drsValue.shape[0]))
 
-        print("Calculate residuen for '"+str(fact.nrPix)+"' Pixel")
+        print("Calculate residuen for '"+str(NRPIX)+"' Pixel")
 
-        for pixelNr in range(fact.nrPix):
-            if(((pixelNr/fact.nrPix*100) % 1) < (((pixelNr-1)/fact.nrPix*100) % 1) and
-               ((pixelNr/fact.nrPix*100) % 1) < (((pixelNr+1)/fact.nrPix*100) % 1)):
-                print("PixelNr:", str('{:4d}'.format(pixelNr+1)), ":", '{:2d}'.format(int(pixelNr/fact.nrPix*100)), '%')
+        for pixelNr in range(NRPIX):
+            if(((pixelNr/NRPIX*100) % 1) < (((pixelNr-1)/NRPIX*100) % 1) and
+               ((pixelNr/NRPIX*100) % 1) < (((pixelNr+1)/NRPIX*100) % 1)):
+                print("PixelNr:", str('{:4d}'.format(pixelNr+1)), ":", '{:2d}'.format(int(pixelNr/NRPIX*100)), '%')
 
             drsTypeResiduenPixel = []
             tempPixel = temp[:, int(pixelNr/9)]
-            for capNr in range(fact.nrCap):
-                drsValueCap = drsValue[:, pixelNr*fact.nrCap+capNr]
-                slopeCap = slope[pixelNr*fact.nrCap+capNr]
-                offsetCap = offset[pixelNr*fact.nrCap+capNr]
+            for capNr in range(NRCAP):
+                drsValueCap = drsValue[:, pixelNr*NRCAP+capNr]
+                slopeCap = slope[pixelNr*NRCAP+capNr]
+                offsetCap = offset[pixelNr*NRCAP+capNr]
                 drsTypeResiduenPixel.append(np.array(drsValueCap-(slopeCap*tempPixel + offsetCap)).astype('float64'))
 
             with h5py.File(storeFilename_) as store:
                 data = store["Residuen"+valueType]
-                data[pixelNr*fact.nrCap:(pixelNr+1)*fact.nrCap] = drsTypeResiduenPixel
+                data[pixelNr*NRCAP:(pixelNr+1)*NRCAP] = drsTypeResiduenPixel
 
     print("Add CreationDate")
     creationDateStr = pd.datetime.now().strftime('%Y-%m-%d %H:%M:%S').encode("UTF-8", "ignore")
