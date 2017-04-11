@@ -22,7 +22,9 @@ setup(
         'matplotlib>=1.4',
     ],
     entry_points={'console_scripts': [
-        'drsTempCalib_train = drsTemperatureCalibration.writeFitValueFile:main',
+        'drsTempCalib_search_drs_files = drsTemperatureCalibration.writeFitValueFile:search_drs_files',
+        'drsTempCalib_save_drs_attributes = drsTemperatureCalibration.writeFitValueFile:save_drs_attributes',
+        'drsTempCalib_save_fit_values = drsTemperatureCalibration.writeFitValueFile:save_fit_values',
         'drsTempCalib_make_plots = drsTemperatureCalibration.do:main',
     ]},
     zip_safe=False,
