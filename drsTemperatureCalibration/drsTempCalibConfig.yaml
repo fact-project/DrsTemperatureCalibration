@@ -1,0 +1,4 @@
+
+drsValueTypes: ["Baseline", "Gain"]
+cutOffErrorFactor: {Baseline: 2, Gain: 2}
+hardwareBoundaries: ["2014-05-20", "2015-05-20"]
