@@ -1,4 +1,11 @@
 
 drsValueTypes: ["Baseline", "Gain"]
 cutOffErrorFactor: {Baseline: 2, Gain: 2}
-hardwareBoundaries: ["2014-05-20", "2015-05-20"]
+hardwareBoundaries: ["2014-05-20", "26.5.2015"]
+
+# hardwareBoundaries
+#
+# 20.05.2014 Camera repair, Replacement of Capacitors
+# 26.5.2015 Replacement FAD board (crate 2, board 0)
+#
+# See also "https://trac.fact-project.org/wiki/Protected/SystemChanges"
