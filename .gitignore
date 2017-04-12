@@ -1,7 +1,12 @@
 *__pycache__*
 
+.eggs/
+drsTemperatureCalibration.egg-info/
+
+
 /plots
 /data
+
 
 runFactTools.py
 .cache
