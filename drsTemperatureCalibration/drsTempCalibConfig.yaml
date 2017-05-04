@@ -1,7 +1,13 @@
 
-drsValueTypes: ["Baseline", "Gain"]
-cutOffErrorFactor: {Baseline: 2, Gain: 2}
-hardwareBoundaries: ["2014-05-20", "26.5.2015"]
+drsValueTypes:
+    - Baseline
+    - Gain
+cutOffErrorFactor:
+    Baseline: 2
+    Gain: 2
+hardwareBoundaries:
+    - 2014-05-20 12
+    - 2015-05-26 12
 
 # hardwareBoundaries
 #
