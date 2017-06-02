@@ -11,29 +11,31 @@ from astropy.io import fits
 from fact.credentials import create_factdb_engine
 
 from drsTemperatureCalibration.tools import safety_stuff
-from drsTemperatureCalibration.constants import NRPIX, NRCAP, NRTEMPSENSOR
+from drsTemperatureCalibration.constants import NRCHID, NRCELL, NRTEMPSENSOR
 
 # TODO overwrite @click.argument defaultValues
-#  use Dynamic Defaults for Prompts -> default=lambda: os.environ.get('value', ''))
+# use Dynamic Defaults for Prompts
+# -> default=lambda: os.environ.get('value', ''))
 
 
-####################################################################################################
-####################################################################################################
+###############################################################################
+###############################################################################
 @click.command()
 @click.argument('drs_file_list_doc_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/drsSourceCollection/drsFiles_.txt",
+                default="/net/big-tank/POOL/" +
+                        "projects/fact/drs_temp_calib_data/" +
+                        "calibration/calculation/drsFiles.txt",
                 type=click.Path(exists=False))
-def search_drs_files(drs_file_list_doc_path: str):
+def Search_drs_files(drs_file_list_doc_path: str):
     '''
-        Search through the fact-database and store the path of all drsFiles under the given storePath
+        Search through the fact-database and store the path of all drsFiles
+        under the given storePath
 
         Args:
-            drs_file_list_doc_path (str): Full path to the storeFile with the extension '.txt'
+            drs_file_list_doc_path (str):
+                Full path to the storeFile
+                with the extension '.txt'
     '''
-
-    print(">> Run 'SearchDrsFiles' <<")
-
     # TODO check safety stuff. maybe remove
     safety_stuff(drs_file_list_doc_path)
 
@@ -56,75 +58,66 @@ def search_drs_files(drs_file_list_doc_path: str):
                                      "fDrsStep == 2 &" +
                                      "fNumEvents == 1000").copy()
     # fNumEvents == 1000 prevent for unfinished/broken files
-    drs_file_infos["date"] = pd.to_datetime(drs_file_infos.fNight.astype(str), format="%Y%m%d")
+    drs_file_infos["date"] = pd.to_datetime(drs_file_infos.fNight.astype(str),
+                                            format="%Y%m%d")
 
     drs_files = drs_file_infos.apply(filename, axis=1).tolist()
-    pd.DataFrame(drs_files).to_csv(drs_file_list_doc_path, index=False, header=False)
-
-    # ##############################
-    # # #### Filter Drs-Files #### #
-    # ##############################
-    #
-    # print(">> In 'SearchDrsFiles' start with filter Drs-Files <<")
-    #
-    # selected_files = []
-    # previous_dates = []
-    # for drs_file_path in drs_files:
-    #     drs_file_path = drs_file_path.strip("\n")
-    #
-    #     date = drs_file_path.split("_")[0].split("/")[-1]
-    #     year = drs_file_path.split("_")[0].split("/")[-4]
-    #     if(date not in previous_dates and int(year) >= 2012):
-    #
-    #         previous_dates.append(date)
-    #         selected_files.append(drs_file_path)
-    #
-    # pd.DataFrame(selected_files).to_csv(store_file_path, index=False, header=False)
-
-    print(">> Finished 'SearchDrsFiles' <<")
+    pd.DataFrame(drs_files).to_csv(drs_file_list_doc_path, index=False,
+                                   header=False)
 
 
-####################################################################################################
-####################################################################################################
-# ##############                         saveDrsAttributes                          ############## #
-####################################################################################################
-####################################################################################################
+###############################################################################
+###############################################################################
+# ##############               saveDrsAttributes               ############## #
+###############################################################################
+###############################################################################
 @click.command()
 @click.argument('drs_file_list_doc_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/drsSourceCollection/drsFiles_.txt",
+                default="/net/big-tank/POOL/" +
+                        "projects/fact/drs_temp_calib_data/" +
+                        "calibration/calculation/drsFiles.txt",
                 type=click.Path(exists=True))
 @click.argument('store_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/drsSourceCollection/drsData.h5",
+                default="/net/big-tank/POOL/" +
+                        "projects/fact/drs_temp_calib_data/" +
+                        "calibration/calculation/drsData.h5",
                 type=click.Path(exists=False))
-@click.argument('source_pre_path',
-                default=("/net/big-tank/POOL/projects/fact/drs_temp_calib_data/"),
+@click.argument('source_folder_path',
+                default=("/net/big-tank/POOL/" +
+                         "projects/fact/drs_temp_calib_data/"),
                 type=click.Path(exists=True))
 @click.argument('drs_temp_calib_config',
-                default="/home/fschulz/drsTemperatureCalibration/drsTemperatureCalibration/" +
+                default="/home/fschulz/git/" +
+                        "drsTemperatureCalibration/drsTemperatureCalibration/" +
                         "drsTempCalibConfig.yaml",
                 type=click.Path(exists=True))
 def save_drs_attributes(drs_file_list_doc_path: str, store_file_path: str,
-                        source_pre_path: str, drs_temp_calib_config: str):
+                        source_folder_path: str, drs_temp_calib_config: str):
     '''
         Save Baseline and Gain of all drsfiles of the given drsFileList
         together with the Temperature and mean of Time of taking
         into a .h5 File
 
         Args:
-            drs_file_list_doc_path (str): Full path to the drsFileList-file with the extension '.txt'
-            store_file_path (str): Full path to the store-file with the extension '.h5'
-            source_pre_path (str): Path to the raw- and aux-folder containing the drs- and temperature-files
-            drs_temp_calib_config (str): Path to the drsCalibrationConfig-file with the extension '.yaml'
+            drs_file_list_doc_path (str):
+                Full path to the drsFileList-file with the extension '.txt'
+            store_file_path (str):
+                Full path to the store-file with the extension '.h5'
+            source_folder_path (str):
+                Path to the raw- and aux-folder containing
+                the drs- and temperature-files
+            drs_temp_calib_config (str):
+                Path to the drsCalibrationConfig-file
+                with the extension '.yaml'
     '''
     # TODO check safety stuff. maybe remove
     safety_stuff(store_file_path)
 
-    logging.basicConfig(filename=store_file_path.split('.')[0]+".log", filemode='w',
-                        format='%(levelname)s:%(message)s', level=logging.DEBUG)
+    logging.basicConfig(
+        filename=store_file_path.split('.')[0]+".log", filemode='w',
+        format='%(levelname)s:%(message)s', level=logging.DEBUG)
 
-    NRCALIBVALUES = NRPIX*NRCAP
+    NRCALIBVALUES = NRCHID*NRCELL
 
     with open(drs_temp_calib_config) as calbConfig:
         config = yaml.safe_load(calbConfig)
@@ -134,22 +127,30 @@ def save_drs_attributes(drs_file_list_doc_path: str, store_file_path: str,
     # add empty columns to h5py table
     with h5py.File(store_file_path, 'w') as hf:
         for drs_value_type in drs_value_types:
-            hf.create_dataset("Time"+drs_value_type,    (0, 1), maxshape=(None, 1),
-                              compression="gzip", compression_opts=9, fletcher32=True)
-            hf.create_dataset("Temp"+drs_value_type,    (0, NRTEMPSENSOR), maxshape=(None, NRTEMPSENSOR),
-                              compression="gzip", compression_opts=9, fletcher32=True)
-            # not necessary for drs calibration
-            hf.create_dataset("TempStd"+drs_value_type, (0, NRTEMPSENSOR), maxshape=(None, NRTEMPSENSOR),
-                              compression="gzip", compression_opts=9, fletcher32=True)
-            hf.create_dataset(drs_value_type+"Mean",    (0, NRCALIBVALUES), maxshape=(None, NRCALIBVALUES),
-                              compression="gzip", compression_opts=9, fletcher32=True)
+            hf.create_dataset(
+                name="Time"+drs_value_type, dtype="float32",
+                shape=(0, 1), maxshape=(None, 1),
+                compression="gzip", compression_opts=9,
+                fletcher32=True)
+            hf.create_dataset(
+                name="Temp"+drs_value_type, dtype="float32",
+                shape=(0, NRTEMPSENSOR), maxshape=(None, NRTEMPSENSOR),
+                compression="gzip", compression_opts=9,
+                fletcher32=True)
+            hf.create_dataset(
+                name=drs_value_type+"Mean", dtype="float32",
+                shape=(0, NRCALIBVALUES), maxshape=(None, NRCALIBVALUES),
+                compression="gzip", compression_opts=9,
+                fletcher32=True)
             # used but check is necessary
-            hf.create_dataset(drs_value_type+"MeanStd", (0, NRCALIBVALUES), maxshape=(None, NRCALIBVALUES),
-                              compression="gzip", compression_opts=9, fletcher32=True)
+            hf.create_dataset(
+                name=drs_value_type+"MeanStd", dtype="float32",
+                shape=(0, NRCALIBVALUES), maxshape=(None, NRCALIBVALUES),
+                compression="gzip", compression_opts=9, fletcher32=True)
 
     # This loop basically iterate over the drsFiles of the drsFileList and
-    # check if there are all needed information/ tuple of attributes for later calculations
-    # based on the selected drsFile
+    # check if there are all needed information/ tuple of attributes
+    #  for later calculations based on the selected drsFile
     # in case they are there, they will simply stored into a h5py table
     # in the case it is impossible to to collect all needed attributes
     # we will continue with the next drsFile
@@ -159,15 +160,21 @@ def save_drs_attributes(drs_file_list_doc_path: str, store_file_path: str,
 
         date_path_part = drs_file_path.split('_')[0]
 
-        drs_file_path = source_pre_path+"raw/"+drs_file_path.strip("\n")
-        temp_file_path = source_pre_path+"aux/{}.FAD_CONTROL_TEMPERATURE.fits".format(date_path_part)
+        drs_file_path = (source_folder_path+"raw/" +
+                         drs_file_path.strip("\n"))
+        temp_file_path = (source_folder_path+"aux/" +
+                          date_path_part+".FAD_CONTROL_TEMPERATURE.fits")
 
         if(os.path.isfile(drs_file_path) and os.path.isfile(temp_file_path)):
             try:
-                save_tuple_of_attribute_if_possible(temp_file_path, drs_file_path, store_file_path, drs_value_types)
+                save_tuple_of_attribute_if_possible(
+                    temp_file_path, drs_file_path,
+                    store_file_path, drs_value_types)
             except Exception as exc:
-                logging.info(exc)
-                continue
+                drs_filename = drs_file_path.split('/')[-1]
+                temp_filename = temp_file_path.split('/')[-1]
+                logging.info("In drs file '"+drs_filename+"'" +
+                             " or temp file '"+temp_filename+"': "+str(exc))
         else:
             drs_filename = drs_file_path.split('/')[-1]
             temp_filename = temp_file_path.split('/')[-1]
@@ -180,7 +187,8 @@ def save_drs_attributes(drs_file_list_doc_path: str, store_file_path: str,
         store.attrs['CreationDate'] = creation_date_str
 
 
-def save_tuple_of_attribute_if_possible(temp_file_path, drs_file_path, store_file_path, drs_value_types):
+def save_tuple_of_attribute_if_possible(temp_file_path, drs_file_path,
+                                        store_file_path, drs_value_types):
     tabDrs = fits.open(
         drs_file_path,
         ignoremissing=True,
@@ -195,23 +203,34 @@ def save_tuple_of_attribute_if_possible(temp_file_path, drs_file_path, store_fil
                                pd.to_datetime(header["RUN"+str(i)+"-END"])
                               ))
 
-    temp_and_time_pairs = get_temp_and_time_pairs_per_drs_value_type(temp_file_path, run_times_list)
+    temp_and_time_pairs = get_temp_and_time_pairs_per_drs_value_type(
+                            temp_file_path,
+                            run_times_list)
 
+    drs_value_mean = []
+    drs_value_mean_std = []
     for drs_value_type in drs_value_types:
-        drs_value_mean = bintable[drs_value_type+"Mean"][0]
-        drs_value_mean_std = bintable[drs_value_type+"Rms"][0]
-
-        drs_filname = drs_file_path.split('/')[-1]
-        check_for_nulls(drs_value_mean, drs_value_type+"Mean", drs_filname)
-        check_for_nulls(drs_value_mean_std, drs_value_type+"MeanStd", drs_filname)
+        drs_value_mean.append(bintable[drs_value_type+"Mean"][0])
+        drs_value_mean_std.append(bintable[drs_value_type+"Rms"][0])
 
     with h5py.File(store_file_path) as table:
         for i in range(len(drs_value_types)):
-            add_value_to_h5py_table(table, "Time"+drs_value_types[i], temp_and_time_pairs[i]['mean_time'])
-            add_value_to_h5py_table(table, "Temp"+drs_value_types[i], temp_and_time_pairs[i]['mean_temp'])
-            add_value_to_h5py_table(table, "TempStd"+drs_value_types[i], temp_and_time_pairs[i]['std_temp'])
-            add_value_to_h5py_table(table, drs_value_types[i]+"Mean", drs_value_mean)
-            add_value_to_h5py_table(table, drs_value_types[i]+"MeanStd", drs_value_mean_std)
+            add_value_to_h5py_table(
+                table,
+                "Time"+drs_value_types[i],
+                temp_and_time_pairs[i]['time_mean'])
+            add_value_to_h5py_table(
+                table,
+                "Temp"+drs_value_types[i],
+                temp_and_time_pairs[i]['temp_mean'])
+            add_value_to_h5py_table(
+                table,
+                drs_value_types[i]+"Mean",
+                drs_value_mean[i])
+            add_value_to_h5py_table(
+                table,
+                drs_value_types[i]+"MeanStd",
+                drs_value_mean_std[i])
 
 
 def add_value_to_h5py_table(h5pyTable, columnName, value):
@@ -223,8 +242,8 @@ def add_value_to_h5py_table(h5pyTable, columnName, value):
 def get_temp_and_time_pairs_per_drs_value_type(temp_path, run_times_list):
     '''
     run_times_list a list() of tuples of (start, end) times per
-    drs run/drs value type, between which we want to build the mean of 'time' and 'temp'
-    from the fits file under 'temp_path'.
+    drs run/drs value type, between which we want to build the mean
+    of 'time' and 'temp' from the fits file under 'temp_path'.
     '''
 
     table = fits.open(temp_path, ignoremissing=True, ignore_missing_end=True)
@@ -241,64 +260,58 @@ def get_temp_and_time_pairs_per_drs_value_type(temp_path, run_times_list):
 
     results = []
     table_datetime = pd.to_datetime(table_time * 24 * 3600 * 1e9)
-    for start, end in run_times_list:
+    for start, end in run_times_list:  # one pair per drs_value_type
         idx = np.where(
             (table_datetime > start) &
             (table_datetime < end)
             )[0]
+
+        if idx.shape[0] == 0:
+            message = ("Cant use drs file," +
+                       " runs out of range of temperature data taking")
+            raise Exception(message)
         timestamps_during_run = np.array(table_time[idx])
         temperature_during_run = np.array(table_temperature[idx])
 
         if timestamps_during_run.shape[0] > 1:
-            mean_time = np.mean(timestamps_during_run, dtype="float64")
+            time_mean = np.mean(timestamps_during_run, dtype="float32")
         else:
-            mean_time = timestamps_during_run
+            time_mean = timestamps_during_run
 
         if temperature_during_run.shape[0] > 1:
-            mean_temp = np.mean(temperature_during_run, dtype="float64", axis=0)
-            std_temp = np.std(temperature_during_run, dtype="float64", axis=0, ddof=1)
+            temp_mean = np.mean(temperature_during_run, dtype="float32",
+                                axis=0)
         else:
-            mean_temp = temperature_during_run
-            std_temp = np.zeros(temperature_during_run.shape[1])
+            temp_mean = temperature_during_run
 
         results.append(dict(
-            mean_time=mean_time,
-            mean_temp=mean_temp,
-            std_temp=std_temp,
+            time_mean=time_mean,
+            temp_mean=temp_mean
             )
         )
+
     return results
 
 
-def check_for_nulls(array, name, filname):
-    nulls = np.where(array == 0.)[0]
-    if len(nulls):
-        raise Exception(
-            (" File not used: Nulls of '{name}' " +
-             "in File '{filname}' \nat indices {idx}").format(
-                name=name,
-                filname=filname,
-                idx=str(nulls)
-            )
-        )
-
-
-####################################################################################################
-####################################################################################################
-# ##############                        storeIntervalIndices                        ############## #
-####################################################################################################
-####################################################################################################
+###############################################################################
+###############################################################################
+# ##############             storeIntervalIndices              ############## #
+###############################################################################
+###############################################################################
 @click.command()
 @click.argument('source_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/drsSourceCollection/drsData.h5",
+                default="/net/big-tank/POOL/" +
+                        "projects/fact/drs_temp_calib_data/" +
+                        "calibration/calculation/drsData.h5",
                 type=click.Path(exists=True))
 @click.argument('store_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/drsSourceCollection/intervalIndices.h5",
+                default="/net/big-tank/POOL/" +
+                        "projects/fact/drs_temp_calib_data/" +
+                        "calibration/calculation/intervalIndices.h5",
                 type=click.Path(exists=False))
 @click.argument('drs_temp_calib_config',
-                default="/home/fschulz/drsTemperatureCalibration/drsTemperatureCalibration/" +
+                default="/home/fschulz/git/" +
+                        "drsTemperatureCalibration/drsTemperatureCalibration/" +
                         "drsTempCalibConfig.yaml",
                 type=click.Path(exists=True))
 def store_source_based_interval_indices(source_file_path: str,
@@ -306,15 +319,20 @@ def store_source_based_interval_indices(source_file_path: str,
                                         drs_temp_calib_config: str):
     """
     Save the interval limits and the associated intervalindices,
-    based on the given '.h5-file' source and the with the 'drsTempCalibConfig.yaml'
-    given boundaries. The result for every drs_value_type should be the same.
-    Also save for every drs_value_type and interval a mask of the with the 'drsTempCalibConfig.yaml'
-    given 'CutOffErrorFactor' based drsValue selection.
+    based on the given '.h5-file' source and
+    the with the 'drsTempCalibConfig.yaml' given boundaries.
+    The result for every drs_value_type should be the same.
+    Also save for every drs_value_type and interval a mask
+    of the with the 'drsTempCalibConfig.yaml' given 'CutOffErrorFactor'
+    based drsValue selection.
 
     Args:
-        source_file_path (str): Full path to the sourceParameter file with the extension '.h5'
-        store_file_path (str): Full path to the storeFile with the extension '.h5'
-        drs_temp_calib_config (str): Path to the drsCalibrationConfig-file with the extension '.yaml'
+        source_file_path (str):
+            Full path to the sourceParameter file with the extension '.h5'
+        store_file_path (str):
+            Full path to the storeFile with the extension '.h5'
+        drs_temp_calib_config (str):
+            Path to the drsCalibrationConfig-file with the extension '.yaml'
     """
     with open(drs_temp_calib_config) as calbConfig:
         config = yaml.safe_load(calbConfig)
@@ -332,8 +350,8 @@ def store_source_based_interval_indices(source_file_path: str,
     with h5py.File(store_file_path) as store:
         store.clear()
         store.attrs["SCDate"] = source_creation_date
-        for k, v in cut_off_error_factor.items():
-            store.attrs["CutOff"+k] = int(v)
+        for key, value in cut_off_error_factor.items():
+            store.attrs["CutOff"+key] = int(value)
 
     nr_of_intervals = len(list_of_interval_indices)
     for interval_nr in range(1, nr_of_intervals+1):
@@ -342,7 +360,6 @@ def store_source_based_interval_indices(source_file_path: str,
         low_limit = interval_limits[interval_nr-1].strftime('%Y-%m-%d %H')
         upp_limit = interval_limits[interval_nr].strftime('%Y-%m-%d %H')
 
-        print(low_limit, upp_limit, interval_indices.shape, interval_indices[0], interval_indices[-1])
         groupname = "Interval"+str(interval_nr)
         with h5py.File(store_file_path) as store:
             drs_group = store.create_group(groupname)
@@ -359,17 +376,23 @@ def store_source_based_interval_indices(source_file_path: str,
         for drs_value_type in drs_value_types:
             with h5py.File(source_file_path, 'r') as data_source:
                 print("Loading ...", drs_value_type, " : ",  interval_nr)
-                drs_value_mean_std_array = np.array(data_source[drs_value_type+"MeanStd"][interval_indices, :])
+                drs_value_mean_std_array = data_source[drs_value_type+"MeanStd"][interval_indices, :]
 
-            indiceMask = np.full((interval_indices.shape[0], NRPIX*NRCAP), True, dtype=bool)
-            for pixel_index in tqdm(range(NRPIX)):
-                for cap_index in range(NRCAP):
-                    drs_value_mean_std_cap = drs_value_mean_std_array[:, pixel_index*NRCAP+cap_index]
-                    drs_value_mean_std_cap_mean = np.mean(drs_value_mean_std_cap, dtype="float")
-                    drs_value_std_limit = drs_value_mean_std_cap_mean*cut_off_error_factor[drs_value_type]
+            indiceMask = np.full(
+                            (interval_indices.shape[0], NRCHID*NRCELL),
+                            True, dtype=bool)
+            for chid in tqdm(range(NRCHID)):
+                for cell in range(NRCELL):
+                    drs_value_mean_std_cell = drs_value_mean_std_array[:, chid*NRCELL+cell]
+                    mask_std_0 = np.array(drs_value_mean_std_cell != 0.)
 
-                    mask = drs_value_mean_std_cap < drs_value_std_limit
-                    indiceMask[:, pixel_index*NRCAP+cap_index] = mask
+                    drs_value_mean_std_cell_mean = np.mean(drs_value_mean_std_cell[mask_std_0], dtype="float")
+                    drs_value_std_limit = drs_value_mean_std_cell_mean*cut_off_error_factor[drs_value_type]
+
+                    mask_limit = np.array(drs_value_mean_std_cell < drs_value_std_limit)
+
+                    mask_total = mask_limit & mask_std_0
+                    indiceMask[:, chid*NRCELL+cell] = mask_total
 
             with h5py.File(store_file_path) as store:
                 store[groupname].create_dataset(drs_value_type+"Mask",
@@ -401,7 +424,9 @@ def get_source_and_boundarie_based_interval_limits_and_indices(
         interval_limits = [lower_boundarie]
         list_of_interval_indices = []
         for boundarie in hardware_boundaries:
-            interval_indices = np.where((datetime >= lower_boundarie) & (datetime < boundarie))[0]
+            interval_indices = np.where(
+                                    (datetime >= lower_boundarie) &
+                                    (datetime < boundarie))[0]
             list_of_interval_indices.append(interval_indices)
             lower_boundarie = boundarie
             interval_limits.append(boundarie)
@@ -424,49 +449,63 @@ def get_source_and_boundarie_based_interval_limits_and_indices(
             interval_dict[drs_value_types[0]]["Indices"])
 
 
-####################################################################################################
-####################################################################################################
-# ##############                           saveFitValues                            ############## #
-####################################################################################################
-####################################################################################################
+###############################################################################
+###############################################################################
+# ##############                 saveFitValues                 ############## #
+###############################################################################
+###############################################################################
 @click.command()
 @click.argument('source_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/drsSourceCollection/drsData.h5",
+                default="/net/big-tank/POOL/" +
+                        "projects/fact/drs_temp_calib_data/" +
+                        "calibration/calculation/drsData.h5",
                 type=click.Path(exists=True))
 @click.argument('interval_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/drsSourceCollection/intervalIndices.h5",
+                default="/net/big-tank/POOL/" +
+                        "projects/fact/drs_temp_calib_data/" +
+                        "calibration/calculation/intervalIndices.h5",
                 type=click.Path(exists=True))
 @click.argument('store_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/fitValues/drsFitValues.fits",
+                default="/net/big-tank/POOL/" +
+                        "projects/fact/drs_temp_calib_data/" +
+                        "calibration/calculation/drsFitParameter.fits",
                 type=click.Path(exists=False))
 @click.argument('drs_temp_calib_config',
-                default="/home/fschulz/drsTemperatureCalibration/drsTemperatureCalibration/" +
+                default="/home/fschulz/git/" +
+                        "drsTemperatureCalibration/drsTemperatureCalibration/" +
                         "drsTempCalibConfig.yaml",
                 type=click.Path(exists=True))
 def save_fit_values(source_file_path: str, interval_file_path: str,
                     store_file_path: str, drs_temp_calib_config: str):
     '''
-        Calculate the linear fitvalues of Basline and Gain based on the .h5 source data for the
-        by the hardware boundaries given itervals and store them into a .fits File
-        All Basline/Gain-values with a bigger error than the 'CutOffErrorFactor'
-        multiplied with the mean of the error from all collected Baseline/Gain-values of the
-        capacitor will not used for the fit
+        Calculate the linear fitvalues of Basline and Gain
+        based on the .h5 source data for the by the hardware boundaries
+        given itervals and store them into a .fits File
+        All Basline/Gain-values with a larger error
+        than the 'CutOffErrorFactor' multiplied with the mean of the error
+        from all collected Baseline/Gain-values of the capacitor
+        will not used for the fit
 
         Args:
-            source_file_path (str): Full path to the sourceParameter file with the extension '.h5'
-            interval_file_path (str): Full path to the sourceParameter based intervalndices
-                                      file with the extension '.h5'
-            store_file_path (str): Full path to the storeFile with the extension '.fits'
-            drs_temp_calib_config (str): Path to the drsCalibrationConfig-file with the extension '.yaml'
+            source_file_path (str):
+                Full path to the sourceParameter file
+                with the extension '.h5'
+            interval_file_path (str):
+                Full path to the sourceParameter based intervalndices file
+                with the extension '.h5'
+            store_file_path (str):
+                Full path to the storeFile
+                with the extension '.fits'
+            drs_temp_calib_config (str):
+                Path to the drsCalibrationConfig-file
+                with the extension '.yaml'
     '''
     # TODO check safety stuff. maybe remove
     safety_stuff(store_file_path)
 
-    logging.basicConfig(filename=store_file_path.split('.')[0]+".log", filemode='w',
-                        format='%(levelname)s:%(message)s', level=logging.DEBUG)
+    logging.basicConfig(
+        filename=store_file_path.split('.')[0]+".log", filemode='w',
+        format='%(levelname)s:%(message)s', level=logging.DEBUG)
 
     # Cecking wether the intervalIndices are based on the given drsData
     if (not check_dependency(source_file_path, interval_file_path)):
@@ -506,30 +545,33 @@ def save_fit_values(source_file_path: str, interval_file_path: str,
             drs_value_mean_offset = []
 
             # calculate the fit values for the selected hardware based interval
-            # of the selected drsValueType for every pixel
-            for pixel_index in tqdm(range(NRPIX)):
-                drs_value_temp = drs_value_temp_array[:, int(pixel_index/9)]
-                for cap_index in range(NRCAP):
-                    drs_value_mean_cap = drs_value_mean_array[:, pixel_index*NRCAP+cap_index]
-                    sub_mask = mask[:, pixel_index*NRCAP+cap_index]
+            # of the selected drsValueType for every chid
+            for chid in tqdm(range(NRCHID)):
+                drs_value_temp = drs_value_temp_array[:, int(chid/9)]
+                for cell in range(NRCELL):
+                    drs_value_mean_cell = drs_value_mean_array[:, chid*NRCELL+cell]
+                    sub_mask = mask[:, chid*NRCELL+cell]
 
                     # dont use drs_value_mean_std for the weighting
                     temp_matrix = np.vstack([drs_value_temp[sub_mask],
                                             np.ones(len(drs_value_temp[sub_mask]))]).T
                     slope, offset = np.linalg.lstsq(temp_matrix,
-                                                    drs_value_mean_cap[sub_mask])[0]
+                                                    drs_value_mean_cell[sub_mask])[0]
                     drs_value_mean_slope.append(slope)
                     drs_value_mean_offset.append(offset)
 
+            no_of_values = len(drs_value_mean_slope)
             new_columns = fits.ColDefs(
-                [fits.Column(name=drs_value_type+"Slope",    format=str(len(drs_value_mean_slope))+'E',
-                             unit="mV/celsius",              array=[drs_value_mean_slope]),
-                 fits.Column(name=drs_value_type+"Offset",   format=str(len(drs_value_mean_offset))+'E',
-                             unit="mV",                      array=[drs_value_mean_offset])])
+                [fits.Column(
+                    name=drs_value_type+"Slope", format=str(no_of_values)+'E',
+                    unit="mV/celsius", array=[drs_value_mean_slope]),
+                 fits.Column(
+                    name=drs_value_type+"Offset", format=str(no_of_values)+'E',
+                    unit="mV", array=[drs_value_mean_offset])])
             column_collection = column_collection + new_columns
             # dont trust the Garbage Collector, so force to free memory
             del drs_value_temp
-            del drs_value_mean_cap
+            del drs_value_mean_cell
             del drs_value_temp_array
             del drs_value_mean_array
 
@@ -589,6 +631,7 @@ def check_dependency(source_file_path: str, interval_file_path: str):
     if(source_creation_date == used_source_creation_date):
         return True
 
-    error_str = ("'interval_file_path' is not based on the given 'source_file_path'")
+    error_str = ("'interval_file_path' is not based" +
+                 "on the given 'source_file_path'")
     logging.error(error_str)
     return False
