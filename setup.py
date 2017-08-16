@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(
-    name='drsTemperatureCalibration',
+    name='drs4Calibration',
     version='0.0.1',
     description='model development for DRS4 amplitude calibration',
     url='http://github.com/fact-project/drsTemperatureCalibration',
@@ -30,13 +30,13 @@ setup(
     ],
     entry_points={'console_scripts': [
         ('drsTempCalib_search_drs_files = ' +
-            'drsTemperatureCalibration.drsFitTool:search_drs_files'),
+            'drsTemperatureCalibration.drs4CalibrationTool:search_drs_files'),
         ('drsTempCalib_save_drs_attributes =' +
-            'drsTemperatureCalibration.drsFitTool:save_drs_attributes'),
+            'drsTemperatureCalibration.drs4CalibrationTool:save_drs_attributes'),
         ('drsTempCalib_store_interval_indices =' +
-            'drsTemperatureCalibration.drsFitTool:store_source_based_interval_indices'),
+            'drsTemperatureCalibration.drs4CalibrationTool:store_source_based_interval_indices'),
         ('drsTempCalib_save_fit_values =' +
-            'drsTemperatureCalibration.drsFitTool:save_fit_values'),
+            'drsTemperatureCalibration.drs4CalibrationTool:save_fit_values'),
         'drsTempCalib_make_plots = drsTemperatureCalibration.do:main',
         ('drsTempCalib_make_plots.pixel_capacitor_drs_values =' +
             'drsTemperatureCalibration.plotDrsAttributes:pixel_capacitor_drs_values')
