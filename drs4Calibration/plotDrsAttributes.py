@@ -18,15 +18,15 @@ from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.animation import FuncAnimation, FFMpegWriter
 from matplotlib.cm import hot
 
-from drsTemperatureCalibration.tools import check_file_match
-from drsTemperatureCalibration.constants import NRCHID, NRCELL, NRPATCH, PEAFACTOR
-
+import drs4Calibration.config as config
+from drs4Calibration.constants import NRCHID, NRCELL, NRPATCH, PEAFACTOR
+from drs4Calibration.tools import check_file_match
 
 ###############################################################################
 # ##############                    Helper                     ############## #
 ###############################################################################
 font = {'family': 'serif',
-        'color':  'grey',
+        'color': 'grey',
         'weight': 'bold',
         'size': 16,
         'alpha': 0.5,
@@ -39,20 +39,22 @@ def linearerFit(x, m, b):
 
 
 ###############################################################################
-# ##############               Drs-Value  Plots                ############## #
+# ##############                General  Plots                 ############## #
 ###############################################################################
+
 @click.command()
 @click.argument('drs_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/drsSourceCollection/drsData.h5",
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
+                        "calibration/calculation/drsData.h5",
                 type=click.Path(exists=True))
 @click.argument('interval_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/drsSourceCollection/intervalIndices.h5",
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
+                        "calibration/calculation/intervalIndices.h5",
                 type=click.Path(exists=True))
 @click.argument('store_file_path',
                 default="/home/fschulz/plots/camera_drs_values_range_-10_10.mp4",
                 type=click.Path(exists=False))
+###############################################################################
 def plot_camera_video(drs_file_path, interval_file_path, store_file_path):
     source_table = h5py.File(drs_file_path, 'r')
     interval_table = h5py.File(interval_file_path, 'r')
@@ -150,24 +152,30 @@ def plot_camera_video(drs_file_path, interval_file_path, store_file_path):
     ani.save(store_file_path, writer=writer)
 
 
+###############################################################################
+# ##############               Drs-Value  Plots                ############## #
+###############################################################################
+
 @click.command()
 @click.argument('drs_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/drsSourceCollection/drsData.h5",
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
+                        "calibration/calculation/drsData.h5",
                 type=click.Path(exists=True))
 @click.argument('interval_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/drsSourceCollection/intervalIndices.h5",
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
+                        "calibration/calculation/intervalIndices.h5",
                 type=click.Path(exists=True))
 @click.argument('store_file_path',
-                default="/home/fschulz/plots/baseline_std_hist.jpg",
+                default="/home/fschulz/plots/roiOffset_std_hist.jpg",
                 type=click.Path(exists=False))
 @click.argument("interval_array",
                 default=[1, 2, 3])
-@click.argument('drs_value_type',
-                default="Gain")
+@click.option('--drs_value_type', '-type',
+              default="TriggerOffset",
+              type=click.Choice(["Baseline", "Gain", "TriggerOffset"]))
 @click.argument('nr_bins',
                 default=150)
+###############################################################################
 def drs_value_std_hist(drs_file_path, interval_file_path,
                        store_file_path, interval_array,
                        drs_value_type, nr_bins):
@@ -182,14 +190,18 @@ def drs_value_std_hist(drs_file_path, interval_file_path,
             data = interval_source[groupname]
             interval_indices = np.array(data["IntervalIndices"])
         with h5py.File(drs_file_path, 'r') as store:
-            drs_value_std = np.array(store[drs_value_type+"MeanStd"][interval_indices, :]).flatten()
+            drs_value_std = store[drs_value_type+"Std"][interval_indices, :].flatten()
 
         drs_value_std_mean = np.mean(drs_value_std)
+        drs_value_std_std = np.std(drs_value_std)
+        drs_value_std_max = max(drs_value_std)
 
+        label = (groupname+" mean: "+str(round(drs_value_std_mean, 2)) +
+                 ", std dev: "+str(round(drs_value_std_std, 2)) +
+                 ", max: "+str(round(drs_value_std_max, 2)))
         weights = np.full(len(drs_value_std), 100/len(drs_value_std))
-        hist = plt.hist(drs_value_std, weights=weights, bins=nr_bins,
-                        range=(0, upper_limit),
-                        label=groupname+" mean: "+str(drs_value_std_mean))
+        plt.hist(drs_value_std, bins=nr_bins, weights=weights,
+                 range=(0, upper_limit), histtype="step", label=label)
 
     plt.title(r"Histogram of "+drs_value_type+"Std", fontsize=16, y=1.01)
     plt.xlabel(r'Std /$\mathrm{mV}$')
@@ -203,61 +215,28 @@ def drs_value_std_hist(drs_file_path, interval_file_path,
 
 
 @click.command()
-@click.argument('chi2_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/residuals/drsChiSquare.h5",
-                type=click.Path(exists=True))
-@click.argument('store_file_path',
-                default="/home/fschulz/plots/chi2_fact_cam_gain.jpg",
-                type=click.Path(exists=False))
-@click.argument("interval_array",
-                default=[1])
-@click.argument('drs_value_type',
-                default="Gain")
-###############################################################################
-def chi2_fact_cam(chi2_file_path, store_file_path,
-                  interval_array, drs_value_type):
-
-    for interval_nr in interval_array:
-        groupname = "Interval"+str(interval_nr)
-        with h5py.File(chi2_file_path, 'r') as chi2_tab:
-            data = chi2_tab[groupname]
-            chi2 = np.mean(np.array(data[drs_value_type+"Chi2"]).reshape(1440, 1024), axis=1)
-            #p = np.mean(np.array(data[drs_value_type+"P"]).reshape(1440, 1024), axis=1)
-
-    plot = camera(abs(chi2), cmap='hot')
-    plt.colorbar(plot, label=r"$| \mathrm{Chi}^2 |$")
-    if(store_file_path is not None):
-        plt.savefig(store_file_path)
-    plt.show()
-    plt.close()
-
-
-@click.command()
 @click.argument('drs_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/drsSourceCollection/drsData.h5",
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
+                        "calibration/calculation/drsData.h5",
                 type=click.Path(exists=True))
 @click.argument('interval_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/drsSourceCollection/intervalIndices.h5",
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
+                        "calibration/calculation/intervalIndices.h5",
                 type=click.Path(exists=True))
 @click.argument('fit_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/fitParameter/drsFitParameter.fits",
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
+                        "calibration/calculation/drsFitParameter.fits",
                 type=click.Path(exists=True))
 @click.argument('store_file_path',
-                default="/home/fschulz/plots/chid565_cell279_gain.jpg",
+                default="/home/fschulz/plots/chid566_cell279_roiOffset.jpg",
                 type=click.Path(exists=False))
 @click.argument("interval_array",
                 default=[2])
-@click.argument('drs_value_type',
-                default="Gain")
-# @click.option('--drs_value_type', '-vt',
-#               default="Baseline",
-#               type=click.Choice(['Baseline', 'Gain']))
+@click.option('--drs_value_type', '-type',
+              default="TriggerOffset",
+              type=click.Choice(["Baseline", "Gain", "TriggerOffset"]))
 @click.argument('chid',
-                default=565)
+                default=566)
 @click.argument('cell',
                 default=279)
 # @click.option('--show_std_dev', '-std',
@@ -267,7 +246,8 @@ def drs_value_cell(drs_file_path, interval_file_path, fit_file_path,
                    store_file_path, interval_array, drs_value_type,
                    chid, cell):
 
-    value_index = chid*NRCELL + cell
+    NRCELLSPERCHID = config.nrCellsPerChid[drs_value_type]
+    value_index = chid*NRCELLSPERCHID + cell
     border = 2.0  # mV
     # Cecking wether the intervalIndices and the fitvalues are based on the given drsData
     check_file_match(drs_file_path,
@@ -296,7 +276,7 @@ def drs_value_cell(drs_file_path, interval_file_path, fit_file_path,
                 mask_collection.append(mask)
         with h5py.File(drs_file_path, 'r') as store:
             temp = np.array(store["Temp"+drs_value_type][interval_indices, int(chid/9)])
-            drs_value = np.array(store[drs_value_type+"Mean"][interval_indices, value_index])
+            drs_value = np.array(store[drs_value_type][interval_indices, value_index])
         with fits.open(fit_file_path, ignoremissing=True, ignore_missing_end=True) as fit_value_tab:
             data = fit_value_tab[groupname].data
             slope = data[drs_value_type+"Slope"][0][value_index]
@@ -308,7 +288,7 @@ def drs_value_cell(drs_file_path, interval_file_path, fit_file_path,
         drs_value_collection.append(drs_value)
         fit_value_collection.append([slope, offset])
 
-        ylabel_str = drs_value_type+r'Mean /$\mathrm{mV}$'
+        ylabel_str = drs_value_type+r' /$\mathrm{mV}$'
         if(in_PEA):
             border = border*PEAFACTOR
             ylabel_str = r'paternNoiseMean /$\mathrm{PEA}$'
@@ -347,13 +327,13 @@ def drs_value_cell(drs_file_path, interval_file_path, fit_file_path,
         if(use_mask):
             mask_u = mask_collection[interval_index][:, value_index]
             mask_nu = np.logical_not(mask_u)
-            sc = img.scatter(temp[mask_u], drs_value[mask_u], s=50, marker="+",
-                             c=color, label="paternNoiseMean with averaged Temperature")
-            sc = img.scatter(temp[mask_nu], drs_value[mask_nu], s=50, marker="*",
-                             c=color, label="paternNoiseMean with averaged Temperature")
+            img.scatter(temp[mask_u], drs_value[mask_u], s=50, marker="+",
+                        c=color, label="paternNoiseMean with averaged Temperature")
+            img.scatter(temp[mask_nu], drs_value[mask_nu], s=50, marker="*",
+                        c=color, label="paternNoiseMean with averaged Temperature")
         else:
-            sc = img.scatter(temp, drs_value, s=50, marker="+",
-                             c=color, label="paternNoiseMean with averaged Temperature")
+            img.scatter(temp, drs_value, s=50, marker="+",
+                        c=color, label="paternNoiseMean with averaged Temperature")
         i_min = i_min+i_max
 
         slope, offset = fit_value_collection[interval_index]
@@ -382,12 +362,402 @@ def drs_value_cell(drs_file_path, interval_file_path, fit_file_path,
 
 @click.command()
 @click.argument('drs_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/drsSourceCollection/drsData.h5",
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
+                        "calibration/calculation/drsData.h5",
                 type=click.Path(exists=True))
 @click.argument('interval_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/drsSourceCollection/intervalIndices.h5",
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
+                        "calibration/calculation/intervalIndices.h5",
+                type=click.Path(exists=True))
+@click.argument('fit_file_path',
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
+                        "calibration/calculation/drsFitParameter.fits",
+                type=click.Path(exists=True))
+@click.argument('chi2_file_path',
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
+                        "calibration/validating/chiSquare/drsChiSquare.h5",
+                type=click.Path(exists=True))
+@click.argument('store_file_path',
+                default="/home/fschulz/videos/roiOffset_chid0.mp4",
+                type=click.Path(exists=False))
+@click.argument("interval_nr",
+                default=2)
+@click.option('--drs_value_type', '-type',
+              default="TriggerOffset",
+              type=click.Choice(["Baseline", "Gain", "TriggerOffset"]))
+@click.argument('chid',
+                default=0)
+# @click.option('--show_std_dev', '-std',
+#               is_flag=False)
+###############################################################################
+def drs_value_cell_video(drs_file_path, interval_file_path, fit_file_path,
+                         chi2_file_path, store_file_path, interval_nr,
+                         drs_value_type, chid):
+
+    use_mask = False
+    NRCELLSPERCHID = config.nrCellsPerChid[drs_value_type]
+
+    groupname = "Interval"+str(interval_nr)
+    with h5py.File(interval_file_path, 'r') as interval_source:
+        data = interval_source[groupname]
+        cut_off_error_factor = interval_source.attrs["CutOff"+drs_value_type]
+        interval_indices = np.array(data["IntervalIndices"])
+        if(use_mask):
+            mask_chid = np.array(data[drs_value_type+"Mask"][:, chid*NRCELLSPERCHID:(chid+1)*NRCELLSPERCHID])
+    with h5py.File(drs_file_path, 'r') as store:
+        time = np.array(store["Time"+drs_value_type][:, 0][interval_indices])
+        temp_chid = np.array(store["Temp"+drs_value_type][interval_indices, int(chid/9)])
+        drs_value_chid = np.array(store[drs_value_type][interval_indices, chid*NRCELLSPERCHID:(chid+1)*NRCELLSPERCHID])
+    with fits.open(fit_file_path, ignoremissing=True, ignore_missing_end=True) as fit_value_tab:
+        data = fit_value_tab[groupname].data
+        slope_chid = data[drs_value_type+"Slope"][0][chid*NRCELLSPERCHID:(chid+1)*NRCELLSPERCHID]
+        offset_chid = data[drs_value_type+"Offset"][0][chid*NRCELLSPERCHID:(chid+1)*NRCELLSPERCHID]
+
+    sc_all = plt.scatter(temp_chid, drs_value_chid[:, 0], c=time)
+    plt.close()  # Dont show sc_all, just use it to create the colorbar
+
+    fig, img = plt.subplots()
+
+    intervalMonth = 3
+    start_date = pd.to_datetime(time[0] * 24 * 3600 * 1e9).date()
+    end_date = pd.to_datetime(time[-1] * 24 * 3600 * 1e9).date()
+    timeLabel = pd.date_range(start=start_date, end=end_date, freq=str(intervalMonth)+"M")
+    cbar = fig.colorbar(sc_all, ticks=dates.MonthLocator(interval=intervalMonth))
+    cbar.ax.set_yticklabels(timeLabel.strftime("%b %Y"))
+    color = cbar.to_rgba(time)
+    color_mean = np.mean(color, axis=0)
+
+    temp_range = np.linspace(min(temp_chid)-1, max(temp_chid)+1, 10000)
+    fit_plot, = plt.plot(temp_range, np.zeros(10000), "-", color=color_mean)
+    if(use_mask):
+        mask_u = mask_chid
+        mask_nu = np.logical_not(mask_u)
+        img.scatter([], [], s=50, marker="+",
+                    c=color, label="paternNoiseMean with averaged Temperature")
+        img.scatter([], [], s=50, marker="*",
+                    c=color, label="paternNoiseMean with averaged Temperature")
+    else:
+        drs_value_plot = img.scatter(np.zeros(len(color)), np.zeros(len(color)), s=50, marker="+",
+                                     c=color, label="paternNoiseMean with averaged Temperature")
+
+    title_str = (drs_value_type+"\nChid: -, Sample: -, ErrFactor: -")
+    img.set_title(title_str, fontsize=15, y=1.04)
+    plt.xlabel(r'Temperature /$\mathrm{^\circ C}$')
+    plt.ylabel(drs_value_type+r' /$\mathrm{mV}$')
+    plt.xlim(min(temp_chid)-1, max(temp_chid)+1)
+    plt.ylim(-15, 15)
+    fig.tight_layout()
+
+    def data_gen(temp_chid, drs_value_chid, slope_chid, offset_chid):
+        for sample in tqdm(range(NRCELLSPERCHID)):
+            title_str = (drs_value_type+"\nChid: "+str(chid)+", Sample: "+str(sample) +
+                         ", ErrFactor: "+str('{:0.1f}'.format(cut_off_error_factor)))
+            drs_value = drs_value_chid[:, sample]
+            #if(use_mask):
+            #    mask = mask_chid[:, sample]
+            slope = slope_chid[sample]
+            offset = offset_chid[sample]
+
+            fit = linearerFit(temp_range, slope, offset)
+            yield (title_str, temp_chid, drs_value, fit)
+        print("done")
+
+    def update(data):
+        title_str, temp, drs_value, fit = data
+        #print(title_str)
+        img.set_title(title_str, fontsize=15, y=1.04)
+
+        new_data = np.hstack((temp[:, np.newaxis], drs_value[:, np.newaxis]))
+        drs_value_plot.set_offsets(new_data)
+
+        fit_plot.set_ydata(fit)
+
+        return img.get_title(), drs_value_plot, fit_plot
+
+    ani = FuncAnimation(
+        fig,
+        update,
+        frames=data_gen(temp_chid, drs_value_chid, slope_chid, offset_chid),
+        interval=1,
+        save_count=NRCELLSPERCHID,
+    )
+    writer = FFMpegWriter(fps=10, bitrate=18000)
+    ani.save(store_file_path, writer=writer)
+
+
+@click.command()
+@click.argument('fit_file_path',
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
+                        "calibration/calculation/drsFitParameter.fits",
+                type=click.Path(exists=True))
+@click.argument('store_file_path',
+                default="/home/fschulz/plots/baselineSlopeChid_500.jpg",
+                type=click.Path(exists=False))
+@click.argument("interval_array",
+                default=[2])
+@click.option('--drs_value_type', '-type',
+              default="TriggerOffset",
+              type=click.Choice(["Baseline", "Gain", "TriggerOffset"]))
+@click.option('--fit_parameter_type', '-fitType',
+              default="Slope",
+              type=click.Choice(["Slope", "Offset"]))
+@click.argument('chid',
+                default=500)
+###############################################################################
+def drs_value_chid_fit_parameter(fit_file_path, store_file_path, interval_array,
+                                 drs_value_type, fit_parameter_type, chid):
+
+    for interval_nr in interval_array:
+        groupname = "Interval"+str(interval_nr)
+        NRCELLSPERCHID = config.nrCellsPerChid[drs_value_type]
+        with fits.open(fit_file_path, ignoremissing=True, ignore_missing_end=True) as fit_value_tab:
+            data = fit_value_tab[groupname].data
+            fit_parameter = data[drs_value_type+fit_parameter_type][0][chid*NRCELLSPERCHID:(chid+1)*NRCELLSPERCHID]
+
+    colors = hot(np.linspace(0, 0, NRCELLSPERCHID))
+    for i in range(33):
+        colors[i*32-1] = [1., 0., 0., 1.]
+
+    cell = np.linspace(0, NRCELLSPERCHID-1, NRCELLSPERCHID)
+    plt.scatter(cell, fit_parameter, s=50, marker="+", color=colors)
+
+    labelStr = ""
+    if(fit_parameter_type == "Offset"):
+        labelStr = fit_parameter_type+r" /$\mathrm{mV}$"
+    elif(fit_parameter_type == "Slope"):
+        labelStr = fit_parameter_type+r" /$\frac{\mathrm{mV}}{\mathrm{^\circ C}}$"
+
+    plt.title((drs_value_type+" "+fit_parameter_type+" CHID:"+str(chid)+"\n" +
+               r" Fit $f(x) = m \cdot x + b$"), fontsize=16, y=1.00)
+    plt.xlabel('Cell [1]')
+    plt.ylabel(labelStr)
+    plt.xlim(-1, NRCELLSPERCHID)
+    plt.grid()
+    # plt.legend(loc='upper right', scatterpoints=1, numpoints=1)
+    plt.savefig(store_file_path)
+    plt.show()
+    plt.close()
+
+
+@click.command()
+@click.argument('chi2_file_path',
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
+                        "calibration/validating/chiSquare/drsChiSquare.h5",
+                type=click.Path(exists=True))
+@click.argument('store_file_path',
+                default="/home/fschulz/plots/chi2_cell_mean_per_chid_gain.pdf",
+                type=click.Path(exists=False))
+@click.argument("interval_array",
+                default=[1, 2, 3])
+@click.option('--drs_value_type', '-type',
+              default="Gain",
+              type=click.Choice(["Baseline", "Gain", "TriggerOffset"]))
+###############################################################################
+def drs_values_chi2_cell_mean_per_chid(chi2_file_path, store_file_path,
+                                       interval_array, drs_value_type):
+
+    y1_prop, y2_prop = 3, 1
+    gs = gridspec.GridSpec(2, 1, height_ratios=[y2_prop, y1_prop])
+    plt.figure(figsize=(10, 8))
+
+    y_split = 1
+    with PdfPages(store_file_path) as pdf:
+        for interval_nr in interval_array:
+            groupname = "Interval"+str(interval_nr)
+            print(groupname)
+            NRCELLSPERCHID = config.nrCellsPerChid[drs_value_type]
+            with h5py.File(chi2_file_path, 'r') as chi2_tab:
+                data = chi2_tab[groupname]
+                chid_chi2 = np.mean(np.array(data[drs_value_type+"Chi2"]).reshape(NRCHID, NRCELLSPERCHID), axis=1)
+            plt.close()
+            plt.figure(figsize=(10, 8))
+            plt.ylabel(r' $\left(|CHI2|\right)$ /$\mathrm{1}$')
+
+            ax0 = plt.subplot(gs[1, 0])
+            ax1 = plt.subplot(gs[0, 0], sharex=ax0)
+            plt.subplots_adjust(hspace=0.1)
+            plt.setp(ax1.get_xticklabels(), visible=False)
+            ax0.spines['top'].set_visible(False)
+            ax1.spines['bottom'].set_visible(False)
+            ax1.xaxis.tick_top()
+            ax1.tick_params(labeltop='off')  # don't put tick labels at the top
+
+            plt.title(drs_value_type+"\n"+groupname)
+            ax0.step(range(1, NRCHID+1), chid_chi2, where="mid")
+            ax1.step(range(1, NRCHID+1), chid_chi2, where="mid")
+
+            x_0, x_1 = -10, 1449
+            d = .015
+            scale1 = (y1_prop+y2_prop)/y1_prop
+            scale2 = (y1_prop+y2_prop)/y2_prop
+            kwargs = dict(transform=ax0.transAxes, color='k', clip_on=False)
+            ax0.plot((-d, d), (1-d*scale1, 1+d*scale1), **kwargs)
+            ax0.plot((1-d, 1+d), (1-d*scale1, 1+d*scale1), **kwargs)
+            kwargs.update(transform=ax1.transAxes)
+            ax1.plot((-d, d), (-d*scale2, d*scale2), **kwargs)
+            ax1.plot((1-d, 1+d), (-d*scale2, d*scale2), **kwargs)
+
+            ax0.set_xlim(x_0, x_1)
+            ax0.set_ylim(0, y_split)
+            ax1.set_ylim(y_split,)
+            ax0.set_xlabel("CHID")
+            pdf.savefig()
+            plt.close()
+
+
+@click.command()
+@click.argument('chi2_file_path',
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
+                        "calibration/validating/chiSquare/drsChiSquare.h5",
+                type=click.Path(exists=True))
+@click.argument('store_file_path',
+                default="/home/fschulz/plots/chi2_fact_cam_gain.jpg",
+                type=click.Path(exists=False))
+@click.argument("interval_array",
+                default=[1])
+@click.option('--drs_value_type', '-type',
+              default="Gain",
+              type=click.Choice(["Baseline", "Gain", "TriggerOffset"]))
+###############################################################################
+def chi2_fact_cam(chi2_file_path, store_file_path,
+                  interval_array, drs_value_type):
+
+    for interval_nr in interval_array:
+        groupname = "Interval"+str(interval_nr)
+        with h5py.File(chi2_file_path, 'r') as chi2_tab:
+            data = chi2_tab[groupname]
+            chi2 = np.mean(np.array(data[drs_value_type+"Chi2"]).reshape(1440, 1024), axis=1)
+
+    plot = camera(abs(chi2), cmap='hot')
+    plt.colorbar(plot, label=r"$| \mathrm{Chi}^2 |$")
+    if(store_file_path is not None):
+        plt.savefig(store_file_path)
+    plt.show()
+    plt.close()
+
+
+@click.command()
+@click.argument('drs_file_path',
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
+                        "calibration/calculation/drsData.h5",
+                type=click.Path(exists=True))
+@click.argument('interval_file_path',
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
+                        "calibration/calculation/intervalIndices.h5",
+                type=click.Path(exists=True))
+@click.argument('fit_file_path',
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
+                        "calibration/calculation/drsFitParameter.fits",
+                type=click.Path(exists=True))
+@click.argument('chi2_file_path',
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
+                        "calibration/validating/chiSquare/drsChiSquare.h5",
+                type=click.Path(exists=True))
+@click.argument('store_file_path',
+                default="/home/fschulz/plots/chi2/outlier_cell_collection_I2_roiOffset_limit_2.5.pdf",
+                type=click.Path(exists=False))
+@click.argument("interval_nr",
+                default=2)
+@click.option('--drs_value_type', '-type',
+              default="TriggerOffset",
+              type=click.Choice(["Baseline", "Gain", "TriggerOffset"]))
+@click.argument("chi2_limit",
+                default=2.5)
+###############################################################################
+def drs_values_chi2_outlier_cell_collection(drs_file_path, interval_file_path,
+                                            chi2_file_path, fit_file_path,
+                                            store_file_path, interval_nr,
+                                            drs_value_type, chi2_limit):
+
+    # Cecking wether the intervalIndices and the fitvalues are based on the given drsData
+    check_file_match(drs_file_path,
+                     chi2_file_path=chi2_file_path,
+                     interval_file_path=interval_file_path,
+                     fit_file_path=fit_file_path)
+
+    NRCELLSPERCHID = config.nrCellsPerChid[drs_value_type]
+
+    groupname = "Interval"+str(interval_nr)
+    with h5py.File(chi2_file_path, 'r') as chi2_tab:
+        data = chi2_tab[groupname]
+        chi2 = data[drs_value_type+"Chi2"][:,0]
+
+    interval_source = h5py.File(interval_file_path, 'r')
+    # cut_off_error_factor = interval_source.attrs["CutOff"+drs_value_type]
+    interval_source = interval_source[groupname]
+    interval_indices = np.array(interval_source["IntervalIndices"])
+
+    fit_value_tab = fits.open(fit_file_path, ignoremissing=True, ignore_missing_end=True)[groupname].data
+
+    count = 0
+    with PdfPages(store_file_path) as pdf:
+        for chid in tqdm(range(NRCHID)):
+            if (chid >= 720 and chid <= 755):
+                continue
+            for cell in range(NRCELLSPERCHID):
+                value_index = chid*NRCELLSPERCHID + cell
+                if chi2[value_index] > chi2_limit:
+                    print("Chid: ", chid, "Cell: ", cell, "Chi2: ", chi2[value_index])
+                    count +=1
+                    mask = np.array(interval_source[drs_value_type+"Mask"][:, value_index])
+                    with h5py.File(drs_file_path, 'r') as store:
+                        time = np.array(store["Time"+drs_value_type][interval_indices, :]).flatten()
+                        temp = store["Temp"+drs_value_type][interval_indices, int(chid/9)]
+                        drs_value = store[drs_value_type][interval_indices, value_index]
+
+                    sc_all = plt.scatter(temp, drs_value, c=np.array(time))
+                    plt.close()  # Dont show sc_all, just use it to create the colorbar
+
+                    fig, img = plt.subplots()
+
+                    intervalMonth = 3
+                    start_date = pd.to_datetime(time[0] * 24 * 3600 * 1e9).date()
+                    end_date = pd.to_datetime(time[-1] * 24 * 3600 * 1e9).date()
+                    timeLabel = pd.date_range(start=start_date, end=end_date, freq=str(intervalMonth)+"M")
+                    cbar = fig.colorbar(sc_all, ticks=dates.MonthLocator(interval=intervalMonth))
+                    cbar.ax.set_yticklabels(timeLabel.strftime("%b %Y"))
+                    timeColor = cbar.to_rgba(time)
+
+                    i_min, i_max = 0, len(temp)
+                    temp_range = np.linspace(min(temp)-1, max(temp)+1, 10000)
+                    color = timeColor[i_min: i_max]
+                    mask_u = mask
+                    mask_nu = np.logical_not(mask_u)
+                    img.scatter(temp[mask_u], drs_value[mask_u], s=50, marker="+",
+                                c=color, label="paternNoiseMean with averaged Temperature")
+                    img.scatter(temp[mask_nu], drs_value[mask_nu], s=50, marker="*",
+                                c=color, label="paternNoiseMean with averaged Temperature")
+
+                    slope = fit_value_tab[drs_value_type+"Slope"][0][value_index]
+                    offset = fit_value_tab[drs_value_type+"Offset"][0][value_index]
+                    fit = linearerFit(temp_range, slope, offset)
+
+                    color_mean = np.mean(color, axis=0)
+                    fitPlot, = plt.plot(temp_range, fit, "-", color=color_mean)
+
+                    #fitPlot, = plt.plot(temp_range, fit-single_photon_limit, "--", color=color_mean)
+                    #fitPlot, = plt.plot(temp_range, fit+single_photon_limit, "--", color=color_mean)
+
+                    plt.title((drs_value_type+", Chi2: "+str('{:0.1f}'.format(chi2[value_index])) +
+                              "\nChid: "+str(chid)+", Cell: "+str(cell)), fontsize=15, y=1.00)  # , fontsize=20, y=0.95
+
+                    plt.xlabel(r'Temperature /$\mathrm{^\circ C}$')
+                    plt.ylabel(drs_value_type+r' /$\mathrm{mV}$')
+                    plt.xlim(min(temp)-1, max(temp)+1)
+                    plt.grid()
+                    plt.gca().ticklabel_format(useOffset=False)
+                    pdf.savefig()
+    print(count)
+
+
+@click.command()
+@click.argument('drs_file_path',
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
+                        "calibration/calculation/drsData.h5",
+                type=click.Path(exists=True))
+@click.argument('interval_file_path',
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
+                        "calibration/calculation/intervalIndices.h5",
                 type=click.Path(exists=True))
 @click.argument('store_file_path',
                 default="/home/fschulz/plots/chid700_cell0_gain.jpg",
@@ -445,8 +815,8 @@ def chid_cell_drs_values_time(drs_file_path, interval_file_path,
                 mask_collection.append(mask)
         with h5py.File(drs_file_path, 'r') as store:
             temp = np.array(store["Temp"+drs_value_type][interval_indices, int(chid/9)])
-            drs_value = np.array(store[drs_value_type+"Mean"][interval_indices, value_index])
-            drs_value_std = np.array(store[drs_value_type+"MeanStd"][interval_indices, value_index])
+            drs_value = np.array(store[drs_value_type][interval_indices, value_index])
+            drs_value_std = np.array(store[drs_value_type+"Std"][interval_indices, value_index])
 
         time_interval = pd.to_datetime(time[interval_indices] * 24 * 3600 * 1e9)
         time_collection.append(time_interval)
@@ -455,7 +825,7 @@ def chid_cell_drs_values_time(drs_file_path, interval_file_path,
         drs_value_std_collection.append(drs_value_std)
 
         single_photon_limit = 2.1  # mV
-        ylabel_str = drs_value_type+r'Mean /$\mathrm{mV}$'
+        ylabel_str = drs_value_type+r' /$\mathrm{mV}$'
         if(in_PEA):
             single_photon_limit *= PEAFACTOR
             ylabel_str = r'paternNoiseMean /$\mathrm{PEA}$'
@@ -498,63 +868,13 @@ def chid_cell_drs_values_time(drs_file_path, interval_file_path,
 
 
 @click.command()
-@click.argument('fit_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/fitParameter/drsFitParameter.fits",
-                type=click.Path(exists=True))
-@click.argument('store_file_path',
-                default="/home/fschulz/plots/baselineSlopeChid_500.jpg",
-                type=click.Path(exists=False))
-@click.argument("interval_array",
-                default=[2])
-@click.argument('drs_value_type',
-                default="Baseline")
-@click.argument('fit_parameter_type',
-                default="Slope")
-@click.argument('chid',
-                default=500)
-###############################################################################
-def drs_value_chid_fit_parameter(fit_file_path, chid, store_file_path, interval_array, drs_value_type, fit_parameter_type,):
-
-    for interval_nr in interval_array:
-        groupname = "Interval"+str(interval_nr)
-        with fits.open(fit_file_path, ignoremissing=True, ignore_missing_end=True) as fit_value_tab:
-            data = fit_value_tab[groupname].data
-            fit_parameter = data[drs_value_type+fit_parameter_type][0][chid*NRCELL:(chid+1)*NRCELL]
-
-    colors = hot(np.linspace(0, 0, NRCELL))
-    for i in range(33):
-        colors[i*32-1] = [1., 0., 0., 1.]
-
-    cell = np.linspace(0, NRCELL-1, NRCELL)
-    plt.scatter(cell, fit_parameter, s=50, marker="+", color=colors)
-
-    labelStr = ""
-    if(fit_parameter_type == "Offset"):
-        labelStr = fit_parameter_type+r" /$\mathrm{mV}$"
-    elif(fit_parameter_type == "Slope"):
-        labelStr = fit_parameter_type+r" /$\frac{\mathrm{mV}}{\mathrm{^\circ C}}$"
-
-    plt.title((drs_value_type+" "+fit_parameter_type+" CHID:"+str(chid)+"\n" +
-               r" Fit $f(x) = m \cdot x + b$"), fontsize=16, y=1.00)
-    plt.xlabel('Cell [1]')
-    plt.ylabel(labelStr)
-    plt.xlim(-1, NRCELL)
-    plt.grid()
-    # plt.legend(loc='upper right', scatterpoints=1, numpoints=1)
-    plt.savefig(store_file_path)
-    plt.show()
-    plt.close()
-
-
-@click.command()
 @click.argument("residuals_file_path",
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
                         "calibration/residuals/drsResiduals.h5",
                 type=click.Path(exists=True))
 @click.argument('interval_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/drsSourceCollection/intervalIndices.h5",
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
+                        "calibration/calculation/intervalIndices.h5",
                 type=click.Path(exists=True))
 @click.argument("interval_array",
                 default=[1])
@@ -604,12 +924,12 @@ def residuals_hist(residuals_file_path, interval_file_path, interval_array, drs_
 
 @click.command()
 @click.argument("residuals_file_path",
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
                         "calibration/residuals/drsResiduals.h5",
                 type=click.Path(exists=True))
 @click.argument('interval_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/drsSourceCollection/intervalIndices.h5",
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
+                        "calibration/calculation/intervalIndices.h5",
                 type=click.Path(exists=True))
 @click.argument("interval_array",
                 default=[1])
@@ -669,73 +989,8 @@ def residuals_hist_outlier(residuals_file_path, interval_file_path,
 
 
 @click.command()
-@click.argument('chi2_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/residuals/drsChiSquare.h5",
-                type=click.Path(exists=True))
-@click.argument('store_file_path',
-                default="/home/fschulz/plots/chi2_cell_mean_per_chid_gain.pdf",
-                type=click.Path(exists=False))
-@click.argument("interval_array",
-                default=[1, 2, 3])
-@click.argument('drs_value_type',
-                default="Gain")
-###############################################################################
-def drs_values_chi2_cell_mean_per_chid(chi2_file_path, store_file_path,
-                                       interval_array, drs_value_type):
-
-    y1_prop, y2_prop = 3, 1
-    gs = gridspec.GridSpec(2, 1, height_ratios=[y2_prop, y1_prop])
-    plt.figure(figsize=(10, 8))
-
-
-    y_split = 1
-    with PdfPages(store_file_path) as pdf:
-        for interval_nr in interval_array:
-            groupname = "Interval"+str(interval_nr)
-            print(groupname)
-            with h5py.File(chi2_file_path, 'r') as chi2_tab:
-                data = chi2_tab[groupname]
-                chid_chi2 = np.mean(abs(np.array(data[drs_value_type+"Chi2"])).reshape(NRCHID, NRCELL), axis=1)
-            plt.close()
-            plt.figure(figsize=(10, 8))
-            plt.ylabel(r'mean $\left(|CHI2|\right)$ /$\mathrm{1}$')
-
-            ax0 = plt.subplot(gs[1, 0])
-            ax1 = plt.subplot(gs[0, 0], sharex=ax0)
-            plt.subplots_adjust(hspace=0.1)
-            plt.setp(ax1.get_xticklabels(), visible=False)
-            ax0.spines['top'].set_visible(False)
-            ax1.spines['bottom'].set_visible(False)
-            ax1.xaxis.tick_top()
-            ax1.tick_params(labeltop='off')  # don't put tick labels at the top
-
-            plt.title(drs_value_type+"\n"+groupname)
-            ax0.step(range(1, NRCHID+1), chid_chi2, where="mid")
-            ax1.step(range(1, NRCHID+1), chid_chi2, where="mid")
-
-            x_0, x_1 = -10, 1449
-            d = .015
-            scale1 = (y1_prop+y2_prop)/y1_prop
-            scale2 = (y1_prop+y2_prop)/y2_prop
-            kwargs = dict(transform=ax0.transAxes, color='k', clip_on=False)
-            ax0.plot((-d, d), (1-d*scale1, 1+d*scale1), **kwargs)
-            ax0.plot((1-d, 1+d), (1-d*scale1, 1+d*scale1), **kwargs)
-            kwargs.update(transform=ax1.transAxes)
-            ax1.plot((-d, d), (-d*scale2, d*scale2), **kwargs)
-            ax1.plot((1-d, 1+d), (-d*scale2, d*scale2), **kwargs)
-
-            ax0.set_xlim(x_0, x_1)
-            ax0.set_ylim(0, y_split)
-            ax1.set_ylim(y_split,)
-            ax0.set_xlabel("CHID")
-            pdf.savefig()
-            plt.close()
-
-
-@click.command()
 @click.argument("residuals_file_path",
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
                         "calibration/residuals/drsResiduals.h5",
                 type=click.Path(exists=True))
 @click.argument('store_file_path',
@@ -759,133 +1014,22 @@ def drs_values_residuals_cell_mean_per_chid(residuals_file_path, store_file_path
             plt.title(drs_value_type+"\n"+groupname)
             plt.step(range(1, NRCHID+1), residuals, where="mid")
             plt.xlabel("CHID")
-            plt.ylabel(r'mean $\left($|residuals|$\right)$ /$\mathrm{mV}$')
+            plt.ylabel(r' $\left($|residuals|$\right)$ /$\mathrm{mV}$')
             pdf.savefig()
             plt.close()
 
 
 @click.command()
 @click.argument('drs_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/drsSourceCollection/drsData.h5",
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
+                        "calibration/calculation/drsData.h5",
                 type=click.Path(exists=True))
 @click.argument('interval_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/drsSourceCollection/intervalIndices.h5",
-                type=click.Path(exists=True))
-@click.argument('fit_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/fitParameter/drsFitParameter.fits",
-                type=click.Path(exists=True))
-@click.argument('chi2_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/residuals/drsChiSquare.h5",
-                type=click.Path(exists=True))
-@click.argument('store_file_path',
-                default="/home/fschulz/plots/outlier_cell_collection_I2_baseline_chi2_limit_2.5.pdf",
-                type=click.Path(exists=False))
-@click.argument("interval_array",
-                default=[2])
-@click.argument('drs_value_type',
-                default="Baseline")
-###############################################################################
-def drs_values_outlier_cell_collection(drs_file_path, interval_file_path,
-                                       chi2_file_path, fit_file_path,
-                                       store_file_path,
-                                       interval_array, drs_value_type):
-
-    # Cecking wether the intervalIndices and the fitvalues are based on the given drsData
-    check_file_match(drs_file_path,
-                     chi2_file_path=chi2_file_path,
-                     interval_file_path=interval_file_path,
-                     fit_file_path=fit_file_path)
-
-    chi2_limit = 2.5
-
-    groupname = "Interval"+str(interval_array[0])
-    with h5py.File(chi2_file_path, 'r') as chi2_tab:
-        data = chi2_tab[groupname]
-        chi2 = abs(np.array(data[drs_value_type+"Chi2"]).flatten())
-
-    interval_source = h5py.File(interval_file_path, 'r')
-    cut_off_error_factor = interval_source.attrs["CutOff"+drs_value_type]
-    interval_source = interval_source[groupname]
-    interval_indices = np.array(interval_source["IntervalIndices"])
-
-    fit_value_tab = fits.open(fit_file_path, ignoremissing=True, ignore_missing_end=True)[groupname].data
-
-    count = 0
-    with PdfPages(store_file_path) as pdf:
-        for chid in tqdm(range(NRCHID)):
-            if (chid >= 720 and chid <= 755):
-                continue
-            for cell in range(NRCELL):
-                value_index = chid*NRCELL + cell
-                if chi2[value_index] > chi2_limit:
-                    print(chid, cell, chi2[value_index])
-                    count +=1
-                    mask = np.array(interval_source[drs_value_type+"Mask"][:, value_index])
-                    with h5py.File(drs_file_path, 'r') as store:
-                        time = np.array(store["Time"+drs_value_type][interval_indices, :]).flatten()
-                        temp = store["Temp"+drs_value_type][interval_indices, int(chid/9)]
-                        drs_value = store[drs_value_type+"Mean"][interval_indices, value_index]
-
-                    sc_all = plt.scatter(temp, drs_value, c=np.array(time))
-                    plt.close()  # Dont show sc_all, just use it to create the colorbar
-
-                    fig, img = plt.subplots()
-
-                    intervalMonth = 3
-                    start_date = pd.to_datetime(time[0] * 24 * 3600 * 1e9).date()
-                    end_date = pd.to_datetime(time[-1] * 24 * 3600 * 1e9).date()
-                    timeLabel = pd.date_range(start=start_date, end=end_date, freq=str(intervalMonth)+"M")
-                    cbar = fig.colorbar(sc_all, ticks=dates.MonthLocator(interval=intervalMonth))
-                    cbar.ax.set_yticklabels(timeLabel.strftime("%b %Y"))
-                    timeColor = cbar.to_rgba(time)
-
-                    i_min, i_max = 0, len(temp)
-                    temp_range = np.linspace(min(temp)-1, max(temp)+1, 10000)
-                    color = timeColor[i_min: i_max]
-                    mask_u = mask
-                    mask_nu = np.logical_not(mask_u)
-                    sc = img.scatter(temp[mask_u], drs_value[mask_u], s=50, marker="+",
-                                     c=color, label="paternNoiseMean with averaged Temperature")
-                    sc = img.scatter(temp[mask_nu], drs_value[mask_nu], s=50, marker="*",
-                                     c=color, label="paternNoiseMean with averaged Temperature")
-
-                    slope = fit_value_tab[drs_value_type+"Slope"][0][value_index]
-                    offset = fit_value_tab[drs_value_type+"Offset"][0][value_index]
-                    fit = linearerFit(temp_range, slope, offset)
-
-                    color_mean = np.mean(color, axis=0)
-                    fitPlot, = plt.plot(temp_range, fit, "-", color=color_mean)
-
-                    #fitPlot, = plt.plot(temp_range, fit-single_photon_limit, "--", color=color_mean)
-                    #fitPlot, = plt.plot(temp_range, fit+single_photon_limit, "--", color=color_mean)
-
-                    plt.title((drs_value_type+"Mean, Chi2: "+str('{:0.1f}'.format(chi2[value_index])) +
-                              "\nChid: "+str(chid)+", Cell: "+str(cell)), fontsize=15, y=1.00)  # , fontsize=20, y=0.95
-
-                    plt.xlabel(r'Temperature /$\mathrm{^\circ C}$')
-                    plt.ylabel(drs_value_type+r'Mean /$\mathrm{mV}$')
-                    plt.xlim(min(temp)-1, max(temp)+1)
-                    plt.grid()
-                    plt.gca().ticklabel_format(useOffset=False)
-                    pdf.savefig()
-    print(count)
-
-
-@click.command()
-@click.argument('drs_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/drsSourceCollection/drsData.h5",
-                type=click.Path(exists=True))
-@click.argument('interval_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/drsSourceCollection/intervalIndices.h5",
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
+                        "calibration/calculation/intervalIndices.h5",
                 type=click.Path(exists=True))
 @click.argument("residuals_file_path",
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
                         "calibration/residuals/drsResiduals.h5",
                 type=click.Path(exists=True))
 @click.argument("interval_array",
@@ -1009,15 +1153,15 @@ def residuals_per_chid_cell(drs_file_path, interval_file_path,
 
 @click.command()
 @click.argument('drs_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/drsSourceCollection/drsData.h5",
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
+                        "calibration/calculation/drsData.h5",
                 type=click.Path(exists=True))
 @click.argument('interval_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/drsSourceCollection/intervalIndices.h5",
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
+                        "calibration/calculation/intervalIndices.h5",
                 type=click.Path(exists=True))
 @click.argument("residuals_file_path",
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
                         "calibration/residuals/drsResiduals_.h5",
                 type=click.Path(exists=True))
 @click.argument("interval_array",
@@ -1058,7 +1202,7 @@ def residuals_mean_per_chid(drs_file_path, interval_file_path, residuals_file_pa
         interval_indices = np.where((datetime >= low_limit) & (datetime <= upp_limit))[0]
         datetime_interval = datetime[interval_indices]
         with h5py.File(drs_file_path, 'r') as store:
-            drs_value_std = np.array(store[drs_value_type+"MeanStd"][interval_indices, chid*NRCELL: (chid+1)*NRCELL])
+            drs_value_std = np.array(store[drs_value_type+"Std"][interval_indices, chid*NRCELL: (chid+1)*NRCELL])
 
         if(False):  # TODO fix
             print(drs_value_std.shape)
@@ -1112,15 +1256,15 @@ def residuals_mean_per_chid(drs_file_path, interval_file_path, residuals_file_pa
 
 @click.command()
 @click.argument('drs_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/drsSourceCollection/drsData.h5",
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
+                        "calibration/calculation/drsData.h5",
                 type=click.Path(exists=True))
 @click.argument('interval_file_path',
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
-                        "calibration/drsSourceCollection/intervalIndices.h5",
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
+                        "calibration/calculation/intervalIndices.h5",
                 type=click.Path(exists=True))
 @click.argument("residuals_file_path",
-                default="/net/big-tank/POOL/projects/fact/drs_temp_calib_data/" +
+                default="/net/big-tank/POOL/projects/fact/drs4_calibration_data/" +
                         "calibration/residuals/drsResiduals.h5",
                 type=click.Path(exists=True))
 @click.argument("interval_array",
@@ -1162,7 +1306,7 @@ def residuals_mean_per_crate(drs_file_path, interval_file_path, residuals_file_p
         interval_indices = np.where((datetime >= low_limit) & (datetime <= upp_limit))[0]
         datetime_interval = datetime[interval_indices]
         with h5py.File(drs_file_path, 'r') as store:
-            drs_value_std = np.array(store[drs_value_type+"MeanStd"][crate_index*int(NRCHID/4)*NRCELL: (crate_index+1)*int(NRCHID/4)*NRCELL])
+            drs_value_std = np.array(store[drs_value_type+"Std"][crate_index*int(NRCHID/4)*NRCELL: (crate_index+1)*int(NRCHID/4)*NRCELL])
 
         if(False):  # TODO fix
             print(drs_value_std.shape)
@@ -1490,7 +1634,7 @@ def noise_fact_cam(drs_file_calibrated, drs_model_calibrated,
 @click.command()
 @click.argument("filename",
                 default="/net/big-tank/POOL/projects/fact/" +
-                        "drs_temp_calib_data/calibration/validating/noise/" +
+                        "drs4_calibration_data/calibration/validating/noise/" +
                         "pedestelNoise_20140911.fits",
                 type=click.Path(exists=True))
 @click.argument("save",
@@ -1552,7 +1696,7 @@ def pedestial_noise(filename, save):
 @click.command()
 @click.argument("folder",
                 default="/net/big-tank/POOL/projects/fact/" +
-                        "drs_temp_calib_data/calibration/validating/noise/",
+                        "drs4_calibration_data/calibration/validating/noise/",
                 type=click.Path(exists=True))
 @click.argument("save",
                 default=True,
@@ -1631,26 +1775,29 @@ def noise_mean_hist(folder, save):
 @click.command()
 @click.argument("folder",
                 default="/net/big-tank/POOL/projects/fact/" +
-                        "drs_temp_calib_data/calibration/validating/noise/",
+                        "drs4_calibration_data/calibration/validating/noiseMean/",
                 type=click.Path(exists=True))
-@click.argument("save",
-                default=True,
-                type=click.BOOL)
+@click.argument("store_file_path",
+                default="/home/fschulz/plots/noise/" +
+                        "calibratedPedestelDataDistribution_CalibratedBaseline.jpg", # CalibratedBaseline, CalibratedStdDev
+                type=click.Path(exists=False))
+@click.option('--calibrated_type', '-type',
+              default="Mean",
+              type=click.Choice(["Mean", "Noise"]))
 ###############################################################################
-def noise_mean_vs_temp(folder, save):
+def noise_mean_vs_temp(folder, store_file_path, calibrated_type):
     print("temp")
-    datetime_limits = [pd.to_datetime("2014"), pd.to_datetime("2017")]
-    store_file_path = "/home/fschulz/plots/noise/pedestelNoiseTempDistribution.jpg"
+    datetime_limits = [pd.to_datetime("2016"), pd.to_datetime("2017")]
     noise_file_list = sorted([file for file in
                               os.listdir(folder)
-                              if (file.startswith('pedestelNoise_') and
+                              if (file.startswith('pedestelNoise') and
                                   file.endswith('.fits'))])
 
     chid_list = np.linspace(0, NRCHID-1, NRCHID, dtype="int")
     useful_chid = chid_list[np.setdiff1d(chid_list,
                                          np.array([
-                                            non_standard_chids["crazy"],
-                                            non_standard_chids["dead"]])-1)]
+                                                   non_standard_chids["crazy"],
+                                                   non_standard_chids["dead"]])-1)]
 
     temp_diff_list = []
     time_list = []
@@ -1660,16 +1807,19 @@ def noise_mean_vs_temp(folder, save):
         datetime = pd.to_datetime(noise_file_path.split('_')[-1].split('.')[0])
         if(datetime < datetime_limits[0] or datetime > datetime_limits[1]):
             continue
+        #print(folder+noise_file_path)
         with fits.open(folder+noise_file_path) as noise_tab:
             nr_runs = len(noise_tab[1].data["PedestelRunId"])
             temp_diff = noise_tab[1].data["TempDiff"]
-            drs_file_calibrated_of_the_day = noise_tab[1].data["DrsCalibratedDataNoise"]
-            drs_model_calibrated_of_the_day = noise_tab[1].data["DrsCalibratedDataNoiseTemp"]
+
+            drs_file_calibrated_of_the_day = noise_tab[1].data["DRSCalibratedData_"+calibrated_type]
+            drs_model_calibrated_of_the_day = noise_tab[1].data["DRSCalibratedData_Temp_"+calibrated_type]
 
         for run_index in range(nr_runs):
             drs_file_calibrated = np.array(drs_file_calibrated_of_the_day[run_index]).reshape(-1, NRCHID)[:, useful_chid].flatten()
             drs_model_calibrated = np.array(drs_model_calibrated_of_the_day[run_index]).reshape(-1, NRCHID)[:, useful_chid].flatten()
 
+            # calculate the mean over all events(1000) and chids per run
             drs_file_calibrated_mean = np.mean(drs_file_calibrated)
             drs_model_calibrated_mean = np.mean(drs_model_calibrated)
 
@@ -1679,6 +1829,9 @@ def noise_mean_vs_temp(folder, save):
                 drs_model_calibrated_mean = drs_model_calibrated_mean*PEAFACTOR
 
             time_list.append(datetime.value / 24 / 3600 / 1e9)
+
+            if(temp_diff[run_index] > 5):
+                print(noise_file_path, run_index+1)
             temp_diff_list.append(temp_diff[run_index])
             drs_file_calibrated_mean_list.append(drs_file_calibrated_mean)
             drs_model_calibrated_mean_list.append(drs_model_calibrated_mean)
@@ -1689,31 +1842,31 @@ def noise_mean_vs_temp(folder, save):
     drs_file_calibrated_collection_std = np.std(drs_file_calibrated_mean_list, dtype="float64", ddof=1)
     drs_model_calibrated_collection_std = np.std(drs_model_calibrated_mean_list, dtype="float64", ddof=1)
 
-    ylabel = r'Noise /$\mathrm{mV}$'
+    ylabel = calibrated_type+r'/$\mathrm{mV}$'
     in_pea = True
     if(in_pea):
-        ylabel = r'Noise /$\mathrm{PEA}$'
+        ylabel = calibrated_type+r'/$\mathrm{PEA}$'
 
     fig, img = plt.subplots()
 
-    label_str = ("Drs-File Noise\nMean: "+str(format(round(drs_file_calibrated_collection_mean, 3), '.3f')) +
+    label_str = ("Drs-File "+calibrated_type+"\nMean: "+str(format(round(drs_file_calibrated_collection_mean, 3), '.3f')) +
                  ", Std: "+str(format(round(drs_file_calibrated_collection_std, 3), '.3f')))
     sc_f = plt.scatter(temp_diff_list, drs_file_calibrated_mean_list,
                        s=50, marker="+", c=time_list, label=label_str)
-    label_str = ("Model Noise\nMean: "+str(format(round(drs_model_calibrated_collection_mean, 3), '.3f')) +
+    label_str = ("Model "+calibrated_type+"\nMean: "+str(format(round(drs_model_calibrated_collection_mean, 3), '.3f')) +
                  ", Std: "+str(format(round(drs_model_calibrated_collection_std, 3), '.3f')))
-    sc_m = plt.scatter(temp_diff_list, drs_model_calibrated_mean_list,
-                       s=50, marker="*", c=time_list, label=label_str)
+    plt.scatter(temp_diff_list, drs_model_calibrated_mean_list,
+                s=50, marker="*", c=time_list, label=label_str)
 
-
-    intervalMonth = 3
+    intervalMonth = 1
     start_date = pd.to_datetime(time_list[0] * 24 * 3600 * 1e9).date()
     end_date = pd.to_datetime(time_list[-1] * 24 * 3600 * 1e9).date()
     timeLabel = pd.date_range(start=start_date, end=end_date, freq=str(intervalMonth)+"M")
     cbar = fig.colorbar(sc_f, ticks=dates.MonthLocator(interval=intervalMonth))
     cbar.ax.set_yticklabels(timeLabel.strftime("%b %Y"))
-    timeColor = cbar.to_rgba(time_list)
+    # timeColor = cbar.to_rgba(time_list)
 
+    plt.title(r"Calibrated PedestelRun "+calibrated_type, fontsize=16, y=1.02)
     plt.xlabel(r'Temperatur /$\mathrm{C\degree}$')
     plt.ylabel(ylabel)
     plt.legend(loc='upper right', numpoints=1, title="")
