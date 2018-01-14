@@ -22,7 +22,7 @@ import tempfile
 import shutil
 
 from IPython import embed
-
+import sys
 
 ###############################################################################
 ###############################################################################
@@ -52,6 +52,7 @@ def search_drs_run_files(list_of_needed_files_doc_path: str):
                        'fRunTypeKey', 'fDrsStep',
                        'fNumEvents'])
     selected_db_table = db_table.query('fNight > 20120000 &' +
+                                       'fNight < 20170801 &' +
                                        '((fRunTypeKey == 3 &' + 'fDrsStep == 0) |' +
                                        ' (fRunTypeKey == 4 &' + 'fDrsStep == 1) |' +
                                        ' (fRunTypeKey == 2 &' + 'fDrsStep == 2)) &' +
@@ -214,7 +215,7 @@ def store_drs_attributes(list_of_needed_files_doc_path: str,
 
         for run_serie in file_collection_of_the_day[1:]:
             run_serie = run_serie.split(',')
-            #store_result(handle_run_serie(run_serie, temperature_file_path, source_folder_path))
+            store_result(handle_run_serie(run_serie, temperature_file_path, source_folder_path))
 
             pool.apply_async(handle_run_serie,
                              args=(run_serie, temperature_file_path, source_folder_path),
@@ -321,8 +322,11 @@ def handle_run_serie(run_serie, temperature_file_path, source_folder_path):
 
         run_serie_result['Gain'] = np.subtract(headline1024_mean, baseline1024_mean)
         # error propagation f = a-b
-        run_serie_result['GainStd'] = np.sqrt(pow(headline1024_std, 2) + pow(baseline1024_std, 2)).astype('float16')
-
+        print(headline1024_std, baseline1024_std)
+        print(np.sqrt(pow(headline1024_std, 2) + pow(baseline1024_std, 2)))
+        print(np.sqrt(pow(headline1024_std, 2) - pow(baseline1024_std, 2)))
+        run_serie_result['GainStd'] = np.sqrt(pow(headline1024_std, 2) - pow(baseline1024_std, 2)).astype('float16')
+        sys.quit()
         return run_serie_result
 
     except Exception as error:
@@ -591,17 +595,6 @@ def get_source_and_boundarie_based_interval_limits_and_indices(
         value_dict['Limits'] = interval_limits
         value_dict['Indices'] = list_of_interval_indices
         interval_dict[drs_value_type] = value_dict
-
-    # Checking whether for every drs_value_type the interval limits and
-    # interval indices are the same
-    for drs_value_index in range(1, len(interval_dict)):
-        if(interval_dict[drs_value_types[0]] != interval_dict[drs_value_types[drs_value_index]]):
-            error_str = ('There are differences between the interval boundaries' +
-                         'of differend drs_value_types')
-            raise Exception(error_str)
-
-    return (interval_dict[drs_value_types[0]]['Limits'],
-            interval_dict[drs_value_types[0]]['Indices'])
 
     # Checking whether for every drs_value_type the interval limits and
     # interval indices are the same

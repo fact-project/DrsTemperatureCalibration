@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-import matplotlib.dates as dates
+import matplotlib.dates as mdates
 
 import sys
 
@@ -21,18 +21,18 @@ from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.cm import hot
 
 import config as config
-from constants import NRCHID, NRCELL, ROI, NRPATCH, PEAFACTOR, DACfactor
+from constants import NRCHID, NRCELL, ROI, NRPATCH, PEAFACTOR, DACfactor, ADCCOUNTSTOMILIVOLT
 
 
 ###############################################################################
 # ##############                    Helper                     ############## #
 ###############################################################################
-def check_file_match(drs_file_path,
+def check_file_match(data_collection_path,
                      interval_file_path=None, fit_file_path=None,
                      residual_file_path=None, chi2_file_path=None):
 
     match_flag = True
-    with h5py.File(drs_file_path, 'r') as data_source:
+    with h5py.File(data_collection_path, 'r') as data_source:
         source_creation_date = data_source.attrs['CreationDate']
 
     if (interval_file_path is not None):
@@ -97,11 +97,39 @@ def linearerFit(x, m, b):
 
 
 ###############################################################################
+def get_not_useful_chids(interval_nr):
+
+    # default values
+    not_useful_chids = np.array([non_standard_chids['crazy'],
+                                 non_standard_chids['dead']]).flatten()
+
+    if(interval_nr == 2):
+        not_useful_chids = np.append(not_useful_chids, np.arange(720, 755+1, 1))
+    elif(interval_nr == 3):
+        not_useful_chids = np.append(not_useful_chids, np.arange(1296, 1299+1, 1))
+        not_useful_chids = np.append(not_useful_chids, np.arange(697, 701+1, 1))
+    # print(np.sort(not_useful_chids))
+    return np.unique(not_useful_chids)
+
+
+###############################################################################
+def get_useful_chids(interval_nr):
+
+    chid_list = np.linspace(0, NRCHID-1, NRCHID, dtype='int')
+
+    not_useful_chids = get_not_useful_chids(interval_nr)
+    useful_chids = chid_list[np.setdiff1d(chid_list, not_useful_chids)]
+    return useful_chids
+
+
+###############################################################################
 # ##############               Drs-Value  Plots                ############## #
 ###############################################################################
 
+###############################################################################
+###############################################################################
 @click.command()
-@click.argument('drs_file_path',
+@click.argument('data_collection_path',
                 default='/net/big-tank/POOL/projects/fact/drs4_calibration_data/' +
                         'calibration/calculation/version_1/dataCollection.h5',
                 type=click.Path(exists=True))
@@ -110,69 +138,286 @@ def linearerFit(x, m, b):
                         'calibration/calculation/version_1/intervalIndices.h5',
                 type=click.Path(exists=True))
 @click.argument('store_file_path',
-                default='/home/fschulz/plots/version_1/drsValues/gain/std_hist.jpg',
+                default='/home/fschulz/plots/version_1/drsValues/gain/std_hist_gain.png',
                 type=click.Path(exists=False))
 @click.argument('interval_array',
-                default=[1, 2, 3])
+                default=[3])
 @click.option('--drs_value_type', '-type',
               default='Gain',
               type=click.Choice(['Baseline', 'Gain']))
-@click.argument('nr_bins',
-                default=100)
+@click.argument('x_lim',
+                default=[0.0, 4.2])
 ###############################################################################
-def drs_value_std_hist(drs_file_path, interval_file_path,
+def drs_value_std_hist(data_collection_path, interval_file_path,
                        store_file_path, interval_array,
-                       drs_value_type, nr_bins):
-    drs_value_std_hist_(drs_file_path, interval_file_path,
+                       drs_value_type, x_lim):
+
+    drs_value_std_hist_(data_collection_path, interval_file_path,
                         store_file_path, interval_array,
-                        drs_value_type, nr_bins)
+                        drs_value_type, x_lim)
 
 
 ###############################################################################
-def drs_value_std_hist_(drs_file_path, interval_file_path,
+def drs_value_std_hist_(data_collection_path, interval_file_path,
                         store_file_path, interval_array,
-                        drs_value_type, nr_bins=100):
-    # Cecking wether the intervalIndices are based on the given dataCollection
-    check_file_match(drs_file_path, interval_file_path=interval_file_path)
+                        drs_value_type, x_lim):
 
     NRCELLSPERCHID = config.nrCellsPerChid[drs_value_type]
 
-    chid_list = np.linspace(0, NRCHID-1, NRCHID, dtype='int')
-    not_useful_chids = np.array([non_standard_chids['crazy'],
-                                 non_standard_chids['dead']]).flatten()
+    factor_str = ''
+    unit_str = r' $\mathrm{mV}$'
 
-    useful_chids = chid_list[np.setdiff1d(chid_list, not_useful_chids)]
-
-    upper_limit = 10
     for interval_nr in interval_array:
         groupname = 'Interval'+str(interval_nr)
+        title_str = 'Intervall '+str(interval_nr)
         print(groupname)
         with h5py.File(interval_file_path, 'r') as interval_source:
             data = interval_source[groupname]
             interval_indices = np.array(data['IntervalIndices'])
         print('loading')
-        with h5py.File(drs_file_path, 'r') as store:
-            drs_value_var = store[drs_value_type+'Var'][interval_indices, :]
-            drs_value_var = drs_value_var.reshape(-1, NRCHID, NRCELLSPERCHID)[:, useful_chids, :].flatten()
-            drs_value_std = np.sqrt(drs_value_var)
+        with h5py.File(data_collection_path, 'r') as store:
+            drs_value_std = store[drs_value_type+'Std'][interval_indices, :].astype('float32')
+
+        useful_chids = get_useful_chids(interval_nr)
+        drs_value_std = drs_value_std.reshape(-1, NRCHID, NRCELLSPERCHID)[:, useful_chids, :].flatten()
+
+        if(drs_value_type == 'Gain'):
+            drs_value_std /= pow(10, 3)
+            factor_str = r' $\cdot$'
+            unit_str = r' $10^{-3}$'
+
         drs_value_std_mean = np.mean(drs_value_std)
         drs_value_std_std = np.std(drs_value_std)
         drs_value_std_max = max(drs_value_std)
+        drs_value_std_min = min(drs_value_std)
 
-        label = (groupname+':' +
-                 '\n Hist:' +
-                 '\n   mean: '+str(round(drs_value_std_mean, 2))+r' $\mathrm{mV}$' +
-                 '\n   std dev: '+str(round(drs_value_std_std, 2))+r' $\mathrm{mV}$' +
-                 '\n max value: '+str(round(drs_value_std_max, 2)))+r' $\mathrm{mV}$'
+        # plot = plt.plot([], [])
+        color = 'g'  # plot[0].get_color()
+        label = (title_str+':' +
+                 '\n'+r' $\overline{Hist}$: '+str(round(drs_value_std_mean, 2))+factor_str+unit_str +
+                 '\n'+r' $\sigma_\mathrm{Hist}$: '+str(round(drs_value_std_std, 2))+factor_str+unit_str +
+                 '\n'+r' $x_\mathrm{Max}$: '+str(round(drs_value_std_max, 2)))+factor_str+unit_str+'\n'
         weights = np.full(len(drs_value_std), 100/len(drs_value_std))
+        print(drs_value_std_max, drs_value_std_min, x_lim[1]-x_lim[0])
+        nr_bins = int(abs((drs_value_std_max-drs_value_std_min))/abs(x_lim[1]-x_lim[0])*100)
         plt.hist(drs_value_std, bins=nr_bins, weights=weights,
-                 range=(0, upper_limit), histtype='step', label=label)
+                 histtype='step', label=label, color=color)
+        del drs_value_std
 
-    plt.title(r'Histogram of '+drs_value_type+' Standart deviation', fontsize=16, y=1.01)
-    plt.xlabel(r'Standart deviation /$\mathrm{mV}$')
-    plt.ylabel(r'Frequency /$\mathrm{\%}$')
-    plt.xlim(0)
+    plt.xlabel(r'Standardabweichung /'+unit_str)
+    plt.ylabel(r'Häufigkeit /$\mathrm{\%}$')
+    plt.xlim(x_lim)
     plt.legend(loc='upper right')
+    plt.tight_layout()
+    if(store_file_path is not None):
+        plt.savefig(store_file_path)
+    plt.show()
+    plt.close()
+
+
+###############################################################################
+@click.command()
+@click.argument('data_collection_path',
+                default='/net/big-tank/POOL/projects/fact/drs4_calibration_data/' +
+                        'calibration/calculation/version_1/dataCollection.h5',
+                type=click.Path(exists=True))
+@click.argument('interval_file_path',
+                default='/net/big-tank/POOL/projects/fact/drs4_calibration_data/' +
+                        'calibration/calculation/version_1/intervalIndices.h5',
+                type=click.Path(exists=True))
+@click.argument('store_file_path',
+                default='/home/fschulz/plots/version_1/drsValues/gain/std_hist_chid250_cell250_gain.png',
+                type=click.Path(exists=False))
+@click.argument('interval_array',
+                default=[3])
+@click.option('--drs_value_type', '-type',
+              default='Gain',
+              type=click.Choice(['Baseline', 'Gain']))
+@click.argument('chid',
+                default=250)
+@click.argument('cell',
+                default=250)
+@click.argument('cut_off_error_factor',
+                default=2)
+@click.argument('x_lim',
+                default=[0.0, 4.2])
+###############################################################################
+def drs_value_std_hist_per_chid_cell(data_collection_path, interval_file_path,
+                                     store_file_path, interval_array,
+                                     drs_value_type, chid,
+                                     cell, cut_off_error_factor,
+                                     x_lim):
+
+    drs_value_std_hist_per_chid_cell_(data_collection_path, interval_file_path,
+                                      store_file_path, interval_array,
+                                      drs_value_type, chid,
+                                      cell, cut_off_error_factor,
+                                      x_lim)
+
+
+###############################################################################
+def drs_value_std_hist_per_chid_cell_(data_collection_path, interval_file_path,
+                                      store_file_path, interval_array,
+                                      drs_value_type, chid,
+                                      cell, cut_off_error_factor,
+                                      x_lim):
+
+    NRCELLSPERCHID = config.nrCellsPerChid[drs_value_type]
+    if(cell > NRCELLSPERCHID):
+        print('ERROR: cell > '+str(NRCELLSPERCHID))
+        return
+
+    value_index = chid*NRCELLSPERCHID + cell
+
+    factor_str = ''
+    unit_str = r' $\mathrm{mV}$'
+    for interval_nr in interval_array:
+        groupname = 'Interval'+str(interval_nr)
+        title_str = 'Intervall '+str(interval_nr)
+        print(groupname)
+        with h5py.File(interval_file_path, 'r') as interval_source:
+            data = interval_source[groupname]
+            interval_indices = np.array(data['IntervalIndices'])
+        print('loading')
+        with h5py.File(data_collection_path, 'r') as store:
+            drs_value_std = store[drs_value_type+'Std'][interval_indices, value_index].astype('float32')
+
+        if(drs_value_type == 'Gain'):
+            drs_value_std /= DACfactor/pow(10, 3)
+            factor_str = r' $\cdot$'
+            unit_str = r' $10^{-3}$'
+        drs_value_std_mean = np.mean(drs_value_std)
+        drs_value_std_std = np.std(drs_value_std)
+        drs_value_std_max = max(drs_value_std)
+        drs_value_std_min = min(drs_value_std)
+
+        drs_value_std_limit = drs_value_std_mean*cut_off_error_factor
+
+        n = len(drs_value_std)
+        n_ = len(drs_value_std[drs_value_std > drs_value_std_limit])
+        print(n_/n*100, '%')
+
+        plot = plt.plot([], [])
+        color = plot[0].get_color()
+        label = (title_str+':' +
+                 '\n'+r' $\overline{Hist}$: '+str(round(drs_value_std_mean, 2))+factor_str+unit_str +
+                 '\n'+r' $\sigma_\mathrm{Hist}$: '+str(round(drs_value_std_std, 2))+factor_str+unit_str +
+                 '\n'+r' $x_\mathrm{Max}$: '+str(round(drs_value_std_max, 2)))+factor_str+unit_str+'\n'
+        weights = np.full(len(drs_value_std), 100/len(drs_value_std))
+        nr_bins = int(abs((drs_value_std_max-drs_value_std_min))/abs(x_lim[1]-x_lim[0])*100)
+        plt.hist(drs_value_std, bins=nr_bins, weights=weights,
+                 histtype='step', label=label, color=color)
+
+        plt.axvline(x=drs_value_std_limit, linewidth=2, ls='--', color=color)
+
+    plt.xlabel(r'Standardabweichung /'+unit_str)
+    plt.ylabel(r'Häufigkeit /$\mathrm{\%}$')
+    plt.xlim(x_lim)
+    plt.legend(loc='upper right')
+    if(store_file_path is not None):
+        plt.savefig(store_file_path)
+    plt.show()
+    plt.close()
+
+
+###############################################################################
+@click.command()
+@click.argument('drs_fit_file_path_array',
+                default=['/net/big-tank/POOL/projects/fact/drs4_calibration_data/' +
+                         'calibration/calculation/version_1/drsFitParameter_interval3.fits'])
+@click.argument('store_file_path',
+                default='/home/fschulz/plots/version_1/model/gain/gain_slope_hist.png',
+                type=click.Path(exists=False))
+@click.option('--drs_value_type', '-type',
+              default='Gain',
+              type=click.Choice(['Baseline', 'Gain']))
+@click.option('--fit_parameter_type', '-type',
+              default='Slope',
+              type=click.Choice(['Slope', 'Offset']))
+@click.argument('x_lim',
+                default=[-1, 1])
+###############################################################################
+def drs_model_parameter_hist(drs_fit_file_path_array, store_file_path,
+                             drs_value_type, fit_parameter_type,
+                             x_lim):
+
+    drs_model_parameter_hist_(drs_fit_file_path_array, store_file_path,
+                              drs_value_type, fit_parameter_type,
+                              x_lim)
+
+
+###############################################################################
+def drs_model_parameter_hist_(drs_fit_file_path_array, store_file_path,
+                              drs_value_type, fit_parameter_type,
+                              x_lim):
+
+    factor_str = ''
+    unit_str_1 = r' $\mathrm{mV}$'
+    unit_str_2 = unit_str_1
+    for fit_file_path in drs_fit_file_path_array:
+        fit_file = fits.open(fit_file_path, ignoremissing=True, ignore_missing_end=True)
+        interval_nr = int(fit_file[0].header['INTNR'])
+
+        useful_chids = get_useful_chids(interval_nr)
+
+        fit_value = fit_file['FitParameter'].data[drs_value_type+fit_parameter_type]
+
+        if(drs_value_type == 'Baseline'):
+            fit_value = fit_value*ADCCOUNTSTOMILIVOLT
+            fit_value_ = fit_value.reshape(NRCHID, NRCELL, ROI)[useful_chids, :, :].flatten()
+        elif(drs_value_type == 'Gain'):
+            if(fit_parameter_type == 'Slope'):
+                fit_value *= pow(10, 3)
+                factor_str = r' $\cdot$'
+                unit_str_1 = r' $10^{-3}$'
+                unit_str_2 = unit_str_1
+            else:
+                unit_str_1 = ''
+                unit_str_2 = '1'
+            fit_value_ = fit_value.reshape(NRCHID, NRCELL)[useful_chids, :].flatten()
+
+        fit_value_mean = np.mean(fit_value_)
+        fit_value_std = np.std(fit_value_)
+        fit_value_min = min(fit_value_)
+        fit_value_max = max(fit_value_)
+
+        #get default green(3rd color) for interval 3
+        plt.plot([], [])
+        plt.plot([], [])
+        plot = plt.plot([], [])
+        color = plot[0].get_color()
+        title_str = 'Intervall '+str(interval_nr)
+        label = (title_str+':' +
+                 '\n'+r' $\overline{Hist}$: '+str(round(fit_value_mean, 2))+factor_str+unit_str_1 +
+                 '\n'+r' $\sigma_\mathrm{Hist}$: '+str(round(fit_value_std, 2))+factor_str+unit_str_1 +
+                 '\n'+r' $x_\mathrm{Min}$: '+str(round(fit_value_min, 2))+factor_str+unit_str_1 +
+                 '\n'+r' $x_\mathrm{Max}$: '+str(round(fit_value_max, 2))+factor_str+unit_str_1+'\n')
+        weights = np.full(len(fit_value_), 100/len(fit_value_))
+        nr_bins = int(abs((fit_value_max-fit_value_min))/abs(x_lim[1]-x_lim[0])*100)
+        plt.hist(fit_value_, bins=nr_bins, weights=weights,
+                 histtype='step', label=label, color=color)
+        del fit_value_
+
+        abs(x_lim[1]-x_lim[0])
+        fit_value = fit_value.flatten()
+        fit_value_min = min(fit_value)
+        fit_value_max = max(fit_value)
+        weights = np.full(len(fit_value), 100/len(fit_value))
+        nr_bins = int(abs((fit_value_max-fit_value_min))/abs(x_lim[1]-x_lim[0])*100)
+        plt.hist(fit_value, bins=nr_bins, weights=weights,
+                 histtype='step', linestyle=('dashed'),
+                 color=color)
+        del fit_value
+
+    x_label_str = 'Steigung a'
+    if(fit_parameter_type == 'Offset'):
+        x_label_str = 'y-Achsenabschnitt b'
+
+    plt.xlabel(x_label_str+r' /'+unit_str_2)
+    plt.ylabel(r'Häufigkeit /$\mathrm{\%}$')
+    plt.xlim(x_lim)
+    plt.legend(loc='upper right')
+    plt.tight_layout()
     if(store_file_path is not None):
         plt.savefig(store_file_path)
     # plt.show()
@@ -181,134 +426,160 @@ def drs_value_std_hist_(drs_file_path, interval_file_path,
 
 ###############################################################################
 @click.command()
+@click.argument('drs_fit_file_path_array',
+                default=['/net/big-tank/POOL/projects/fact/drs4_calibration_data/' +
+                         'calibration/calculation/version_1/drsFitParameter_interval3.fits'])
+@click.argument('store_file_path',
+                default='/home/fschulz/plots/version_1/model/baseline/residual_hist_baseline.png',
+                type=click.Path(exists=False))
+@click.option('--drs_value_type', '-type',
+              default='Baseline',
+              type=click.Choice(['Baseline', 'Gain']))
+###############################################################################
+def drs_fit_value_residual_hist(drs_fit_file_path_array, store_file_path,
+                                drs_value_type, x_lim):
+
+    drs_fit_value_residual_hist_(drs_fit_file_path_array, store_file_path,
+                                 drs_value_type, x_lim)
+
+
+###############################################################################
+def drs_fit_value_residual_hist_(drs_fit_file_path_array, store_file_path,
+                                 drs_value_type, x_lim):
+
+    factor_str = ''
+    unit_str = r' $\mathrm{mV}$'
+    for fit_file_path in drs_fit_file_path_array:
+        fit_file = fits.open(fit_file_path, ignoremissing=True, ignore_missing_end=True)
+        interval_nr = int(fit_file[0].header['INTNR'])
+
+        useful_chids = get_useful_chids(interval_nr)
+
+        res_value = fit_file['FitParameter'].data[drs_value_type+'Residual']
+        if(drs_value_type == 'Baseline'):
+            res_value = res_value*ADCCOUNTSTOMILIVOLT
+            res_value_ = res_value.reshape(NRCHID, NRCELL, ROI)[useful_chids, :, :].flatten()
+        elif(drs_value_type == 'Gain'):
+            res_value *= pow(10, 3)
+            factor_str = r' $\cdot$'
+            unit_str = r' $10^{-3}$'
+
+            res_value_ = res_value.reshape(NRCHID, NRCELL)[useful_chids, :].flatten()
+
+        res_value_mean = np.mean(res_value_)
+        res_value_std = np.std(res_value_)
+        res_value_min = 0
+        res_value_max = max(res_value_)
+
+        #get default green(3rd color) for interval 3
+        plt.plot([], [])
+        plt.plot([], [])
+        plot = plt.plot([], [])
+        color = plot[0].get_color()
+        title_str = 'Intervall '+str(interval_nr)
+        label = (title_str+':' +
+                 '\n'+r' $\overline{Hist}$: '+str(round(res_value_mean, 2))+factor_str+unit_str +
+                 '\n'+r' $\sigma_\mathrm{Hist}$: '+str(round(res_value_std, 2))+factor_str+unit_str +
+                 '\n'+r' $x_\mathrm{Max}$: '+str(round(res_value_max, 2))+factor_str+unit_str+'\n')
+        weights = np.full(len(res_value_), 100/len(res_value_))
+        nr_bins = int(abs((res_value_max-res_value_min))/abs(x_lim[1]-x_lim[0])*100)
+        plt.hist(res_value_, bins=nr_bins, weights=weights,
+                 histtype='step', label=label, color=color)
+        del res_value_
+
+        abs(x_lim[1]-x_lim[0])
+        res_value = res_value.flatten()
+        res_value_min = 0
+        res_value_max = max(res_value)
+        weights = np.full(len(res_value), 100/len(res_value))
+        nr_bins = int(abs((res_value_max-res_value_min))/abs(x_lim[1]-x_lim[0])*100)
+        plt.hist(res_value, bins=nr_bins, weights=weights,
+                 histtype='step', linestyle=('dashed'),
+                 color=color)
+        del res_value
+
+    plt.xlabel(r'Residuenmittelwert /'+unit_str)
+    plt.ylabel(r'Häufigkeit /$\mathrm{\%}$')
+    plt.xlim(x_lim)
+    plt.legend(loc='upper right')
+    plt.tight_layout()
+    if(store_file_path is not None):
+        plt.savefig(store_file_path)
+    #plt.show()
+    plt.close()
+
+
+###############################################################################
+###############################################################################
+@click.command()
 @click.argument('fit_file_path',
                 default='/net/big-tank/POOL/projects/fact/drs4_calibration_data/' +
-                        'calibration/calculation/version_1/drsFitParameter_.fits',
-                type=click.Path(exists=True))
+                        'calibration/calculation/version_1/drsFitParameter_interval1.fits')
 @click.argument('store_file_path',
-                default='/home/fschulz/plots/version_1/residual/gain/fact_cam_residual_int2.jpg',
+                default='/home/fschulz/plots/version_1/model/gain/fact_cam_residual_int2_gain.jpg',
                 type=click.Path(exists=False))
-@click.argument('interval_nr',
-                default=2)
 @click.option('--drs_value_type', '-type',
-              default='Gain',
+              default='Baseline',
               type=click.Choice(['Baseline', 'Gain']))
-@click.argument('worse_chids',
+@click.argument('worst_chids',
                 default=[])
 ###############################################################################
 def residual_fact_cam(fit_file_path, store_file_path,
-                      interval_nr, drs_value_type,
-                      worse_chids):
+                      drs_value_type, worst_chids):
+
     residual_fact_cam_(fit_file_path, store_file_path,
-                       interval_nr, drs_value_type,
-                       worse_chids)
+                       drs_value_type, worst_chids)
 
 
 ###############################################################################
 def residual_fact_cam_(fit_file_path, store_file_path,
-                       interval_nr, drs_value_type,
-                       worse_chids=[]):
+                       drs_value_type, worst_chids=[]):
 
-    NRCELLSPERCHID = config.nrCellsPerChid[drs_value_type]
+    with fits.open(fit_file_path, ignoremissing=True, ignore_missing_end=True) as fit_file:
+        interval_nr = int(fit_file[0].header['INTNR'])
+        print('interval_nr: ', interval_nr)
 
-    groupname = 'Interval'+str(interval_nr)
-    with fits.open(fit_file_path, ignoremissing=True, ignore_missing_end=True) as fit_value_tab:
-        residual = fit_value_tab[groupname].data[drs_value_type+'Residual'][0].reshape(NRCHID, NRCELLSPERCHID)
+        res_value = fit_file['FitParameter'].data[drs_value_type+'Residual']
 
     unit_str = r'$\mathrm{mV}$'
-    if(drs_value_type == 'Gain'):
-        residual /= pow(10, -3)
+    if(drs_value_type == 'Baseline'):
+        res_value = res_value*ADCCOUNTSTOMILIVOLT
+        res_value = res_value.reshape(NRCHID, NRCELL*ROI)
+    elif(drs_value_type == 'Gain'):
+        res_value *= pow(10, 3)
         unit_str = r'$\times 10^{-3}$'
 
-    residual_per_chid = np.mean(residual, axis=1)
+        res_value = res_value.reshape(NRCHID, NRCELL)
 
-    not_useful_chids = np.array([non_standard_chids['crazy'],
-                                 non_standard_chids['dead']]).flatten()
+    not_useful_chids = get_not_useful_chids(interval_nr)
 
-    residual_per_chid[worse_chids] = 0
-    residual_per_chid[worse_chids] = np.max(residual_per_chid)
+    residual_per_chid = np.mean(res_value, axis=1)
+    # print(worst_chids)
+    # worst_chids = list(np.sort(worst_chids))
+    # print(worst_chids)
+    # print(residual_per_chid[worst_chids])
 
-    plt.title(drs_value_type+'-residual mean per Pixel\n Interval: {}'.format(interval_nr), fontsize=16, y=1.01)
+    residual_per_chid[worst_chids] = 0
+    residual_per_chid[not_useful_chids] = 0
+    residual_per_chid[worst_chids] = np.max(residual_per_chid)
+    residual_per_chid[not_useful_chids] = np.max(residual_per_chid)
+
     plot = factPlots.camera(residual_per_chid, cmap='hot')
     factPlots.mark_pixel(not_useful_chids, color='b', linewidth=1)
-    factPlots.mark_pixel(worse_chids, color='r', linewidth=1)
-    # factPlots.pixelids(size=10)
+    factPlots.mark_pixel(worst_chids, color='r', linewidth=1)
+    #factPlots.pixelids(size=10)
 
-    plt.colorbar(plot, label=r'Residual mean per pixel /'+unit_str)
+    plt.colorbar(plot, label=r'Mittelwert des Betrags der Residuen eines Pixels/'+unit_str)
+    plt.tight_layout()
     if(store_file_path is not None):
         plt.savefig(store_file_path)
-    # plt.show()
+    #plt.show()
     plt.close()
 
 
 ###############################################################################
 @click.command()
-@click.argument('fit_file_path',
-                default='/net/big-tank/POOL/projects/fact/drs4_calibration_data/' +
-                        'calibration/calculation/version_1/drsFitParameter_.fits',
-                type=click.Path(exists=True))
-@click.argument('store_file_path',
-                default='/home/fschulz/plots/version_1/residual/residual_roi_hist.jpg',
-                type=click.Path(exists=False))
-@click.argument('interval_array',
-                default=[1, 2, 3])
-@click.option('--drs_value_type', '-type',
-              default='Baseline',
-              type=click.Choice(['Baseline', 'Gain']))
-@click.argument('nr_bins',
-                default=100)
-###############################################################################
-def drs_fit_value_residual_hist(fit_file_path, store_file_path,
-                                interval_array, drs_value_type,
-                                nr_bins):
-    drs_fit_value_residual_hist_(fit_file_path, store_file_path,
-                                 interval_array, drs_value_type,
-                                 nr_bins)
-
-
-###############################################################################
-def drs_fit_value_residual_hist_(fit_file_path, store_file_path,
-                                 interval_array, drs_value_type,
-                                 nr_bins=100):
-    upper_limit = 1  # mV or 1
-    for interval_nr in interval_array:
-        groupname = 'Interval'+str(interval_nr)
-        print(groupname)
-        with fits.open(fit_file_path, ignoremissing=True, ignore_missing_end=True) as fit_value_tab:
-            residual = fit_value_tab[groupname].data[drs_value_type+'Residual'][0]
-
-        unit_str = r'$\mathrm{mV}$'
-        if(drs_value_type == 'Gain'):
-            unit_str = r'$\times 10^{-3}$'
-            residual /= pow(10, -3)
-
-        drs_value_residual_mean = np.mean(residual)
-        drs_value_residual_std = np.std(residual)
-        drs_value_residual_max = max(residual)
-
-        label = (groupname+':' +
-                 '\n Hist:' +
-                 '\n   mean: '+str(round(drs_value_residual_mean, 2))+unit_str +
-                 '\n   std dev: '+str(round(drs_value_residual_std, 2))+unit_str +
-                 '\n max value: '+str(round(drs_value_residual_max, 2)))+unit_str
-        weights = np.full(len(residual), 100/len(residual))
-        plt.hist(residual, bins=nr_bins, weights=weights,
-                 range=(0, upper_limit), histtype='step', label=label)
-
-    plt.title(r'Histogram of the absolute '+drs_value_type+'-residual mean', fontsize=16, y=1.01)
-    plt.xlabel(r'Absolute residual mean /'+unit_str)
-    plt.ylabel(r'Frequency /$\mathrm{\%}$')
-    plt.xlim(0)
-    plt.legend(loc='upper right')
-    if(store_file_path is not None):
-        plt.savefig(store_file_path)
-    # plt.show()
-    plt.close()
-
-
-###############################################################################
-@click.command()
-@click.argument('drs_file_path',
+@click.argument('data_collection_path',
                 default='/net/big-tank/POOL/projects/fact/drs4_calibration_data/' +
                         'calibration/calculation/version_1/dataCollection.h5',
                 type=click.Path(exists=True))
@@ -335,13 +606,13 @@ def drs_fit_value_residual_hist_(fit_file_path, store_file_path,
                 default=100)
 ###############################################################################
 def worst_cell_collection_selected_by_residual(
-                                    drs_file_path, interval_file_path,
+                                    data_collection_path, interval_file_path,
                                     fit_file_path, store_file_path,
                                     interval_nr, drs_value_type,
                                     worse_chids, selected_values):
 
     worst_cell_collection_selected_by_residual_(
-                                    drs_file_path, interval_file_path,
+                                    data_collection_path, interval_file_path,
                                     fit_file_path, store_file_path,
                                     interval_nr, drs_value_type,
                                     worse_chids, selected_values)
@@ -349,7 +620,7 @@ def worst_cell_collection_selected_by_residual(
 
 ###############################################################################
 def worst_cell_collection_selected_by_residual_(
-                                    drs_file_path, interval_file_path,
+                                    data_collection_path, interval_file_path,
                                     fit_file_path, store_file_path,
                                     interval_nr, drs_value_type,
                                     worse_chids, selected_values=100):
@@ -396,7 +667,7 @@ def worst_cell_collection_selected_by_residual_(
 
             #print('Chid: ', chid, 'Cell: ', cell, 'Residual: ', residual)
             mask = np.array(interval_source[drs_value_type+'Mask'][:, value_index])
-            with h5py.File(drs_file_path, 'r') as store:
+            with h5py.File(data_collection_path, 'r') as store:
                 time = np.array(store['Time'+drs_value_type][interval_indices, :]).flatten()
                 temp = store['Temp'+drs_value_type][interval_indices, int(chid/9)]
                 drs_value = store[drs_value_type][interval_indices, value_index]
@@ -506,6 +777,7 @@ def chid_startcell_distribution(list_of_needed_files_doc_path, source_folder_pat
 
 
 ###############################################################################
+###############################################################################
 @click.command()
 @click.argument('data_folder_path',
                 default='/net/big-tank/POOL/projects/fact/' +
@@ -514,34 +786,37 @@ def chid_startcell_distribution(list_of_needed_files_doc_path, source_folder_pat
                 type=click.Path(exists=True))
 @click.argument('store_file_path',
                 default='/home/fschulz/plots/version_1/meanAndStd/interval3/' +
-                        'calibratedPedestelDataDistribution_std.jpg', #_2016-04-01
+                        'calibratedPedestelDataDistribution_mean.png', #_2016-04-01
                 type=click.Path(exists=False))
 @click.option('--calibrated_type', '-type',
-              default='Std',
+              default='Mean',
               type=click.Choice(['Mean', 'Std']))
-@click.argument('worse_chids',
-                default=[])
+@click.argument('interval_nr',
+                default=3)
 @click.argument('datetime_limits_string',
-                default=['2015-05-26', '2017-10-01'])# ['2014-05-20 12', '2015-05-26 12'] # '2015-05-26'
+                default=['2015-05-26', '2017-10-01'])
+###############################################################################
+def pedestel_mean_or_std_vs_temp(data_folder_path, store_file_path,
+                                 calibrated_type, interval_nr,
+                                 datetime_limits_string):
+
+    pedestel_mean_or_std_vs_temp_(data_folder_path, store_file_path,
+                                  calibrated_type, interval_nr,
+                                  datetime_limits_string)
+
+
 ###############################################################################
 def pedestel_mean_or_std_vs_temp_(data_folder_path, store_file_path,
-                                  calibrated_type, worse_chids,
+                                  calibrated_type, interval_nr,
                                   datetime_limits_string):
-    print('pedestel_mean_or_std_vs_temp_')
-    in_pea = True
 
+    in_pea = True
     noise_file_list = sorted([file for file in
                               os.listdir(data_folder_path)
                               if (file.startswith('pedestelStats') and
                                   file.endswith('.fits'))])
 
-    chid_list = np.linspace(0, NRCHID-1, NRCHID, dtype='int')
-    not_useful_chids = np.array([non_standard_chids['crazy'],
-                                 non_standard_chids['dead']]).flatten()
-
-    not_useful_chids = np.unique(np.sort(np.append(not_useful_chids, worse_chids)))
-
-    useful_chids = chid_list[np.setdiff1d(chid_list, not_useful_chids)]
+    useful_chids = get_useful_chids('Interval'+str(interval_nr))
 
     datetime_limits = [pd.to_datetime(datetime_limits_string[0]),
                        pd.to_datetime(datetime_limits_string[1])]
@@ -568,7 +843,7 @@ def pedestel_mean_or_std_vs_temp_(data_folder_path, store_file_path,
 
             # calculate the mean over all events(1000) and chids per run
             drs_file_calibrated_mean = np.mean(drs_file_calibrated)
-            drs_model_calibrated_mean = np.mean(drs_model_calibrated[~np.isnan(drs_model_calibrated)])
+            drs_model_calibrated_mean = np.mean(drs_model_calibrated)
             if(in_pea):
                 drs_file_calibrated_mean = drs_file_calibrated_mean*PEAFACTOR
                 drs_model_calibrated_mean = drs_model_calibrated_mean*PEAFACTOR
@@ -592,60 +867,62 @@ def pedestel_mean_or_std_vs_temp_(data_folder_path, store_file_path,
     drs_file_calibrated_collection_std = np.std(drs_file_calibrated_mean_list, dtype="float64", ddof=1)
     drs_model_calibrated_collection_std = np.std(drs_model_calibrated_mean_list, dtype="float64", ddof=1)
 
-    ylabel = calibrated_type+r'/$\mathrm{mV}$'
+    unit_str = r'/$\mathrm{mV}$'
+    calibrated_type_str = 'Mittelwert'
+    if(calibrated_type == 'Std'):
+        calibrated_type_str = 'Standartabweichung'
+
     if(in_pea):
-        ylabel = calibrated_type+r'/$\mathrm{PEA}$'
+        unit_str = r'$\mathrm{PEA}$'
+    ylabel = calibrated_type_str+'/'+unit_str
 
     gs = gridspec.GridSpec(1, 11)
     fig = plt.figure(figsize=(12, 10), dpi=100)
-    fig.suptitle(r"Calibrated PedestelRun "+calibrated_type, fontsize=24, y=0.95)
 
     ax0 = plt.subplot(gs[0, 0:5])
     ax1 = plt.subplot(gs[0, 5:11], sharey=ax0)
     fig.subplots_adjust(wspace=0.5)
     ax1.tick_params(labelleft='off')
 
-    label_str = ("Distribution: Mean:"+str(format(round(drs_file_calibrated_collection_mean, 3), '.3f')) +
-                 ", Std: "+str(format(round(drs_file_calibrated_collection_std, 3), '.3f')))
+    label_str = ("Mittelwert: "+str(format(round(drs_file_calibrated_collection_mean, 3), '.3f'))+unit_str +
+                 ",\nStandartabweichung: "+str(format(round(drs_file_calibrated_collection_std, 3), '.3f')))+unit_str
     sc = ax0.scatter(time_list, drs_file_calibrated_mean_list,
                      s=50, marker=".", c=temp_diff_list, label=label_str)
-    label_str = ("Distribution: Mean:"+str(format(round(drs_model_calibrated_collection_mean, 3), '.3f')) +
-                 ", Std: "+str(format(round(drs_model_calibrated_collection_std, 3), '.3f')))
+    label_str = ("Mittelwert: "+str(format(round(drs_model_calibrated_collection_mean, 3), '.3f'))+unit_str +
+                 ",\nStandartabweichung: "+str(format(round(drs_model_calibrated_collection_std, 3), '.3f')))+unit_str
     sc = ax1.scatter(time_list, drs_model_calibrated_mean_list,
                      s=50, marker=".", c=temp_diff_list, label=label_str)
 
     cbar = fig.colorbar(sc)
-    cbar.set_label(r'Delta Temperatur /$\mathrm{C\degree}$')
-    ax0.xaxis.set_major_locator(dates.MonthLocator(interval=3))
-    ax0.xaxis.set_minor_locator(dates.MonthLocator(interval=1))
-    ax0.xaxis.set_major_formatter(dates.DateFormatter('%b %Y'))
-    ax0.fmt_xdata = dates.DateFormatter('%Y-%m-%d %H:%M:%S')
-    ax1.xaxis.set_major_locator(dates.MonthLocator(interval=3))
-    ax1.xaxis.set_minor_locator(dates.MonthLocator(interval=1))
-    ax1.xaxis.set_major_formatter(dates.DateFormatter('%b %Y'))
-    ax1.fmt_xdata = dates.DateFormatter('%Y-%m-%d %H:%M:%S')
+    cbar.set_label(r'|Pedestal-Run Temperatur - DRS-Run Temperatur| /$\mathrm{C\degree}$')
+    ax0.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+    ax0.xaxis.set_minor_locator(mdates.MonthLocator(interval=1))
+    ax0.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
+    ax0.fmt_xdata = mdates.DateFormatter('%Y-%m-%d %H:%M:%S')
+    ax1.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+    ax1.xaxis.set_minor_locator(mdates.MonthLocator(interval=1))
+    ax1.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
+    ax1.fmt_xdata = mdates.DateFormatter('%Y-%m-%d %H:%M:%S')
     plt.gcf().autofmt_xdate()
 
     ax0.set_title('DRS-File', fontsize=16, y=0.92)
     ax0.text(0.6, 0.15, "DRS-File")
     ax0.yaxis.grid(linestyle=':')
-    ax0.set_xlabel(r'Time')
     ax0.set_ylabel(ylabel)
     ax0.legend(loc='lower left', numpoints=1, title="")
     ax1.set_title('Model', fontsize=16, y=0.92)
     ax1.yaxis.grid(linestyle=':')
-    ax1.set_xlabel(r'Time')
     ax1.legend(loc='lower left', numpoints=1, title="")
-    #plt.text(0.6, 0.15, "preliminary", fontdict=font, transform=plt.gca().transAxes)
+    plt.tight_layout()
     if(store_file_path is not None):
         plt.savefig(store_file_path)
-    plt.show()
+    #plt.show()
     plt.close()
 
 
 ###############################################################################
 @click.command()
-@click.argument('drs_file_path',
+@click.argument('data_collection_path',
                 default='/net/big-tank/POOL/projects/fact/drs4_calibration_data/' +
                         'calibration/calculation/version_1/dataCollection.h5',
                 type=click.Path(exists=True))
@@ -674,7 +951,7 @@ def pedestel_mean_or_std_vs_temp_(data_folder_path, store_file_path,
 # @click.option('--show_var_dev', '-var',
 #               is_flag=False)
 ###############################################################################
-def drs_value_cell(drs_file_path, interval_file_path, fit_file_path,
+def drs_value_cell(data_collection_path, interval_file_path, fit_file_path,
                    store_file_path, interval_array, drs_value_type,
                    chid, cell, sample):
 
@@ -682,12 +959,12 @@ def drs_value_cell(drs_file_path, interval_file_path, fit_file_path,
     value_index_data = (chid*NRCELL+cell)*ROI+sample
     border = 2.0  # mV
     # Cecking wether the intervalIndices and the fitvalues are based on the given dataCollection
-    # check_file_match(drs_file_path,
+    # check_file_match(data_collection_path,
     #                  interval_file_path=interval_file_path,
     #                  fit_file_path=fit_file_path)
 
     # loading source data
-    with h5py.File(drs_file_path, 'r') as store:
+    with h5py.File(data_collection_path, 'r') as store:
         time = np.array(store['Time'+drs_value_type]).flatten()
 
     use_mask = False
@@ -705,7 +982,7 @@ def drs_value_cell(drs_file_path, interval_file_path, fit_file_path,
             if(use_mask):
                 mask = np.array(data[drs_value_type+'Mask'])
                 mask_collection.append(mask)
-        with h5py.File(drs_file_path, 'r') as store:
+        with h5py.File(data_collection_path, 'r') as store:
             temp = np.array(store['Temp'+drs_value_type][interval_indices, int(chid/9)])
             drs_value = np.array(store[drs_value_type][interval_indices, value_index_data])
         with fits.open(fit_file_path, ignoremissing=True, ignore_missing_end=True) as fit_value_tab:
@@ -864,215 +1141,7 @@ def drs_value_chid_fit_parameter(fit_file_path, store_file_path, interval_array,
 
 
 @click.command()
-@click.argument('chi2_file_path',
-                default='/net/big-tank/POOL/projects/fact/drs4_calibration_data/' +
-                        'calibration/validating/chiSquare/drsChiSquare.h5',
-                type=click.Path(exists=True))
-@click.argument('store_file_path',
-                default='/home/fschulz/plots/chi2_cell_mean_per_chid_gain.pdf',
-                type=click.Path(exists=False))
-@click.argument('interval_array',
-                default=[1, 2, 3])
-@click.option('--drs_value_type', '-type',
-              default='Gain',
-              type=click.Choice(['Baseline', 'Gain']))
-###############################################################################
-def drs_values_chi2_cell_mean_per_chid(chi2_file_path, store_file_path,
-                                       interval_array, drs_value_type):
-
-    y1_prop, y2_prop = 3, 1
-    gs = gridspec.GridSpec(2, 1, height_ratios=[y2_prop, y1_prop])
-    plt.figure(figsize=(10, 8))
-
-    y_split = 1
-    with PdfPages(store_file_path) as pdf:
-        for interval_nr in interval_array:
-            groupname = 'Interval'+str(interval_nr)
-            print(groupname)
-            NRCELLSPERCHID = config.nrCellsPerChid[drs_value_type]
-            with h5py.File(chi2_file_path, 'r') as chi2_tab:
-                data = chi2_tab[groupname]
-                chid_chi2 = np.mean(np.array(data[drs_value_type+'Chi2']).reshape(NRCHID, NRCELLSPERCHID), axis=1)
-            plt.close()
-            plt.figure(figsize=(10, 8))
-            plt.ylabel(r' $\left(|CHI2|\right)$ /$\mathrm{1}$')
-
-            ax0 = plt.subplot(gs[1, 0])
-            ax1 = plt.subplot(gs[0, 0], sharex=ax0)
-            plt.subplots_adjust(hspace=0.1)
-            plt.setp(ax1.get_xticklabels(), visible=False)
-            ax0.spines['top'].set_visible(False)
-            ax1.spines['bottom'].set_visible(False)
-            ax1.xaxis.tick_top()
-            ax1.tick_params(labeltop='off')  # don't put tick labels at the top
-
-            plt.title(drs_value_type+'\n'+groupname)
-            ax0.step(range(1, NRCHID+1), chid_chi2, where='mid')
-            ax1.step(range(1, NRCHID+1), chid_chi2, where='mid')
-
-            x_0, x_1 = -10, 1449
-            d = .015
-            scale1 = (y1_prop+y2_prop)/y1_prop
-            scale2 = (y1_prop+y2_prop)/y2_prop
-            kwargs = dict(transform=ax0.transAxes, color='k', clip_on=False)
-            ax0.plot((-d, d), (1-d*scale1, 1+d*scale1), **kwargs)
-            ax0.plot((1-d, 1+d), (1-d*scale1, 1+d*scale1), **kwargs)
-            kwargs.update(transform=ax1.transAxes)
-            ax1.plot((-d, d), (-d*scale2, d*scale2), **kwargs)
-            ax1.plot((1-d, 1+d), (-d*scale2, d*scale2), **kwargs)
-
-            ax0.set_xlim(x_0, x_1)
-            ax0.set_ylim(0, y_split)
-            ax1.set_ylim(y_split,)
-            ax0.set_xlabel('CHID')
-            pdf.savefig()
-            plt.close()
-
-
-@click.command()
-@click.argument('chi2_file_path',
-                default='/net/big-tank/POOL/projects/fact/drs4_calibration_data/' +
-                        'calibration/validating/chiSquare/drsChiSquare.h5',
-                type=click.Path(exists=True))
-@click.argument('store_file_path',
-                default='/home/fschulz/plots/chi2_fact_cam_gain.jpg',
-                type=click.Path(exists=False))
-@click.argument('interval_array',
-                default=[1])
-@click.option('--drs_value_type', '-type',
-              default='Gain',
-              type=click.Choice(['Baseline', 'Gain']))
-###############################################################################
-def chi2_fact_cam(chi2_file_path, store_file_path,
-                  interval_array, drs_value_type):
-
-    for interval_nr in interval_array:
-        groupname = 'Interval'+str(interval_nr)
-        with h5py.File(chi2_file_path, 'r') as chi2_tab:
-            data = chi2_tab[groupname]
-            chi2 = np.mean(np.array(data[drs_value_type+'Chi2']).reshape(1440, 1024), axis=1)
-
-    plot = factPlots.camera(abs(chi2), cmap='hot')
-    plt.colorbar(plot, label=r'$| \mathrm{Chi}^2 |$')
-    if(store_file_path is not None):
-        plt.savefig(store_file_path)
-    plt.show()
-    plt.close()
-
-
-@click.command()
-@click.argument('drs_file_path',
-                default='/net/big-tank/POOL/projects/fact/drs4_calibration_data/' +
-                        'calibration/calculation/version_1/dataCollection.h5',
-                type=click.Path(exists=True))
-@click.argument('interval_file_path',
-                default='/net/big-tank/POOL/projects/fact/drs4_calibration_data/' +
-                        'calibration/calculation/version_1/intervalIndices.h5',
-                type=click.Path(exists=True))
-@click.argument('fit_file_path',
-                default='/net/big-tank/POOL/projects/fact/drs4_calibration_data/' +
-                        'calibration/calculation/version_1/drsFitParameter.fits',
-                type=click.Path(exists=True))
-@click.argument('store_file_path',
-                default='/home/fschulz/plots/version_1/chi2/outlier_cell_collection_I3_gain_limit_65.pdf',
-                type=click.Path(exists=False))
-@click.argument('interval_nr',
-                default=3)
-@click.option('--drs_value_type', '-type',
-              default='Gain',
-              type=click.Choice(['Baseline', 'Gain']))
-@click.argument('chi2_limit',
-                default=65)
-###############################################################################
-def drs_values_chi2_outlier_cell_collection(drs_file_path, interval_file_path,
-                                            fit_file_path,
-                                            store_file_path, interval_nr,
-                                            drs_value_type, chi2_limit):
-
-    # Cecking wether the intervalIndices and the fitvalues are based on the given dataCollection
-    # check_file_match(drs_file_path,
-    #                  interval_file_path=interval_file_path,
-    #                  fit_file_path=fit_file_path)
-
-    NRCELLSPERCHID = config.nrCellsPerChid[drs_value_type]
-
-    groupname = 'Interval'+str(interval_nr)
-
-    interval_source = h5py.File(interval_file_path, 'r')
-    # cut_off_error_factor = interval_source.attrs['CutOff'+drs_value_type]
-    interval_source = interval_source[groupname]
-    interval_indices = np.array(interval_source['IntervalIndices'])
-
-    fit_value_tab = fits.open(fit_file_path, ignoremissing=True, ignore_missing_end=True)[groupname].data
-    chi2 = fit_value_tab[drs_value_type+'Chi2']
-    count = 0
-    with PdfPages(store_file_path) as pdf:
-        for chid in tqdm(range(NRCHID)):
-            chi2_chid = chi2[chid*NRCELLSPERCHID:(chid+1)*NRCELLSPERCHID]
-            nr_of_incrased_chi2_values = len(chi2_chid[chi2_chid > chi2_limit])
-            if nr_of_incrased_chi2_values > 10:
-                print(chid, nr_of_incrased_chi2_values)
-                continue
-            for cell in range(NRCELLSPERCHID):
-                value_index = chid*NRCELLSPERCHID + cell
-                if chi2_chid[cell] > chi2_limit:
-                    print('Chid: ', chid, 'Cell: ', cell, 'Chi2: ', chi2_chid[cell])
-                    count += 1
-                    mask = np.array(interval_source[drs_value_type+'Mask'][:, value_index])
-                    with h5py.File(drs_file_path, 'r') as store:
-                        time = np.array(store['Time'+drs_value_type][interval_indices, :]).flatten()
-                        temp = store['Temp'+drs_value_type][interval_indices, int(chid/9)]
-                        drs_value = store[drs_value_type][interval_indices, value_index]
-
-                    #if(drs_value_type == 'Gain'):
-                        #drs_value /= DACfactor
-                    sc_all = plt.scatter(temp, drs_value, c=np.array(time))
-                    plt.close()  # Dont show sc_all, just use it to create the colorbar
-
-                    fig, img = plt.subplots()
-
-                    intervalMonth = 3
-                    start_date = pd.to_datetime(time[0] * 24 * 3600 * 1e9).date()
-                    end_date = pd.to_datetime(time[-1] * 24 * 3600 * 1e9).date()
-                    timeLabel = pd.date_range(start=start_date, end=end_date, freq=str(intervalMonth)+'M')
-                    cbar = fig.colorbar(sc_all, ticks=dates.MonthLocator(interval=intervalMonth))
-                    cbar.ax.set_yticklabels(timeLabel.strftime('%b %Y'))
-                    timeColor = cbar.to_rgba(time)
-
-                    i_min, i_max = 0, len(temp)
-                    temp_range = np.linspace(min(temp)-1, max(temp)+1, 10000)
-                    color = timeColor[i_min: i_max]
-                    mask_u = mask
-                    mask_nu = np.logical_not(mask_u)
-                    img.scatter(temp[mask_u], drs_value[mask_u], s=50, marker='+',
-                                c=color, label='paternNoiseMean with averaged Temperature')
-                    img.scatter(temp[mask_nu], drs_value[mask_nu], s=50, marker='*',
-                                c=color, label='paternNoiseMean with averaged Temperature')
-
-                    slope = fit_value_tab[drs_value_type+'Slope'][value_index]
-                    offset = fit_value_tab[drs_value_type+'Offset'][value_index]
-                    fit = linearerFit(temp_range, slope, offset)
-
-                    color_mean = np.mean(color, axis=0)
-                    fitPlot, = plt.plot(temp_range, fit, '-', color=color_mean)
-
-                    #fitPlot, = plt.plot(temp_range, fit-single_photon_limit, '--', color=color_mean)
-                    #fitPlot, = plt.plot(temp_range, fit+single_photon_limit, '--', color=color_mean)
-
-                    plt.title((drs_value_type+', Chi2: '+str('{:0.1f}'.format(chi2[value_index])) +
-                              '\nChid: '+str(chid)+', Cell: '+str(cell)), fontsize=15, y=1.00)  # , fontsize=20, y=0.95
-
-                    plt.xlabel(r'Temperature /$\mathrm{^\circ C}$')
-                    plt.ylabel(drs_value_type+r' /$\mathrm{mV}$')
-                    plt.xlim(min(temp)-1, max(temp)+1)
-                    plt.grid()
-                    plt.gca().ticklabel_format(useOffset=False)
-                    pdf.savefig()
-    print(count)
-
-
-@click.command()
-@click.argument('drs_file_path',
+@click.argument('data_collection_path',
                 default='/net/big-tank/POOL/projects/fact/drs4_calibration_data/' +
                         'calibration/calculation/dataCollection.h5',
                 type=click.Path(exists=True))
@@ -1097,14 +1166,14 @@ def drs_values_chi2_outlier_cell_collection(drs_file_path, interval_file_path,
 # @click.option('--show_var_dev', '-var',
 #               is_flag=False)
 ###############################################################################
-def chid_cell_drs_values_time(drs_file_path, interval_file_path,
+def chid_cell_drs_values_time(data_collection_path, interval_file_path,
                               store_file_path, interval_array,
                               drs_value_type, chid, cell):
 
     value_index = chid*NRCELL + cell
 
     # Cecking wether the intervalIndices and the fitvalues are based on the given dataCollection
-    with h5py.File(drs_file_path, 'r') as data_source:
+    with h5py.File(data_collection_path, 'r') as data_source:
         source_creation_date = data_source.attrs['CreationDate']
 
     with h5py.File(interval_file_path) as interval_source:
@@ -1115,7 +1184,7 @@ def chid_cell_drs_values_time(drs_file_path, interval_file_path,
         print(error_str)
         return
 
-    with h5py.File(drs_file_path, 'r') as store:
+    with h5py.File(data_collection_path, 'r') as store:
         time = np.array(store['Time'+drs_value_type]).flatten()
 
     use_mask = True
@@ -1134,7 +1203,7 @@ def chid_cell_drs_values_time(drs_file_path, interval_file_path,
             if(use_mask):
                 mask = np.array(data[drs_value_type+'Mask'][:, value_index])
                 mask_collection.append(mask)
-        with h5py.File(drs_file_path, 'r') as store:
+        with h5py.File(data_collection_path, 'r') as store:
             temp = np.array(store['Temp'+drs_value_type][interval_indices, int(chid/9)])
             drs_value = np.array(store[drs_value_type][interval_indices, value_index])
             drs_value_var = np.array(store[drs_value_type+'Std'][interval_indices, value_index])
@@ -1202,61 +1271,6 @@ def chid_cell_drs_values_time(drs_file_path, interval_file_path,
 @click.argument('drs_value_type',
                 default='Baseline')
 @click.argument('store_file_path',
-                default='/home/fschulz/plots/residualBaseline_his_I1.jpg',
-                type=click.Path(exists=False))
-####################################################################################################
-def residual_hist(residual_file_path, interval_file_path, interval_array, drs_value_type, store_file_path):
-
-    with h5py.File(interval_file_path) as interval_source:
-        used_source_creation_date_i = interval_source.attrs['SCDate']
-
-    with h5py.File(residual_file_path) as residual_source:
-        used_source_creation_date_r = residual_source.attrs['SCDate']
-
-    if(used_source_creation_date_i != used_source_creation_date_r):
-        error_str = ("'interval_file_path' and 'residual_file_path' dont belong together")
-        print(error_str)
-
-    for interval_nr in interval_array:
-        groupname = 'Interval'+str(interval_nr)
-        with h5py.File(interval_file_path, 'r') as interval_source:
-            data = interval_source[groupname]
-            mask = np.array(data[drs_value_type+'Mask'])
-
-        with h5py.File(residual_file_path, 'r') as residual_tab:
-            data = residual_tab[groupname]
-            residual = np.array(data[drs_value_type+'residual'])
-            residual = residual[mask].flatten()
-
-    outlier = np.where(abs(residual) > 2.1)[0]
-    print('outlier: ', len(outlier)/len(residual)*100, ' %')
-
-    nr_bins = 40
-    title_str = 'Hist'
-    plt.title(title_str, y=1.0)
-    weights = np.full(len(residual), 100/len(residual))
-    hist1 = plt.hist(residual, weights=weights, bins=nr_bins, histtype='step',
-                     range=(-1, 1), lw=1, edgecolor='r', label='test')
-    if(store_file_path is not None):
-        plt.savefig(store_file_path)
-    plt.show()
-    plt.close()
-
-
-@click.command()
-@click.argument('residual_file_path',
-                default='/net/big-tank/POOL/projects/fact/drs4_calibration_data/' +
-                        'calibration/residual/drsresidual.h5',
-                type=click.Path(exists=True))
-@click.argument('interval_file_path',
-                default='/net/big-tank/POOL/projects/fact/drs4_calibration_data/' +
-                        'calibration/calculation/intervalIndices.h5',
-                type=click.Path(exists=True))
-@click.argument('interval_array',
-                default=[1])
-@click.argument('drs_value_type',
-                default='Baseline')
-@click.argument('store_file_path',
                 default='/home/fschulz/plots/residualBaseline_hisout_I1.jpg',
                 type=click.Path(exists=False))
 ###############################################################################
@@ -1303,533 +1317,6 @@ def residual_hist_outlier(residual_file_path, interval_file_path,
     plt.ylabel(r'Frequency /$\mathrm{\%}$')
     plt.xlim(1, NRCHID+1)
     plt.ylim(0, )
-    if(store_file_path is not None):
-        plt.savefig(store_file_path)
-    plt.show()
-    plt.close()
-
-
-@click.command()
-@click.argument('residual_file_path',
-                default='/net/big-tank/POOL/projects/fact/drs4_calibration_data/' +
-                        'calibration/residual/drsresidual.h5',
-                type=click.Path(exists=True))
-@click.argument('store_file_path',
-                default='/home/fschulz/plots/residual_cell_mean_per_chid_gain.pdf',
-                type=click.Path(exists=False))
-@click.argument('interval_array',
-                default=[1, 2, 3])
-@click.argument('drs_value_type',
-                default='Gain')
-###############################################################################
-def drs_values_residual_cell_mean_per_chid(residual_file_path, store_file_path,
-                                            interval_array, drs_value_type):
-
-    with PdfPages(store_file_path) as pdf:
-        for interval_nr in interval_array:
-            groupname = 'Interval'+str(interval_nr)
-            print(groupname)
-            with h5py.File(residual_file_path, 'r') as residual_tab:
-                data = residual_tab[groupname]
-                residual = np.mean(np.mean(abs(np.array(data[drs_value_type+'residual'])), axis=0).reshape(NRCHID, NRCELL), axis=1)
-            plt.title(drs_value_type+'\n'+groupname)
-            plt.step(range(1, NRCHID+1), residual, where='mid')
-            plt.xlabel('CHID')
-            plt.ylabel(r' $\left($|residual|$\right)$ /$\mathrm{mV}$')
-            pdf.savefig()
-            plt.close()
-
-
-@click.command()
-@click.argument('drs_file_path',
-                default='/net/big-tank/POOL/projects/fact/drs4_calibration_data/' +
-                        'calibration/calculation/dataCollection.h5',
-                type=click.Path(exists=True))
-@click.argument('interval_file_path',
-                default='/net/big-tank/POOL/projects/fact/drs4_calibration_data/' +
-                        'calibration/calculation/intervalIndices.h5',
-                type=click.Path(exists=True))
-@click.argument('residual_file_path',
-                default='/net/big-tank/POOL/projects/fact/drs4_calibration_data/' +
-                        'calibration/residual/drsresidual.h5',
-                type=click.Path(exists=True))
-@click.argument('interval_array',
-                default=[1, 2, 3])
-@click.argument('drs_value_type',
-                default='Baseline')
-@click.argument('chid',
-                default=161)
-@click.argument('cell',
-                default=494)
-@click.argument('restrict_residual',
-                default=True,
-                type=click.BOOL)
-@click.argument('store_file_path',
-                default='/home/fschulz/plots/residualBaseline_chid721_cap500_3Intervals_RestrictParts.jpg',
-                type=click.Path(exists=False))
-###############################################################################
-def residual_per_chid_cell(drs_file_path, interval_file_path,
-                           residual_file_path, store_file_path,
-                           interval_array, drs_value_type,
-                           chid, cell,
-                           restrict_residual):
-
-    value_index = chid*NRCELL + cell
-
-    # Cecking wether the intervalIndices and the fitvalues are based on the given dataCollection
-    with h5py.File(drs_file_path, 'r') as data_source:
-        source_creation_date = data_source.attrs['CreationDate']
-
-    with h5py.File(interval_file_path) as interval_source:
-        used_source_creation_date_i = interval_source.attrs['SCDate']
-
-    with h5py.File(residual_file_path) as residual_source:
-        used_source_creation_date_r = residual_source.attrs['SCDate']
-
-    if((source_creation_date != used_source_creation_date_i) or
-       (source_creation_date != used_source_creation_date_r)):
-        error_str = ("'interval_file_path' or 'residual_file_path' is not based on the given 'source_file_path'")
-        print(error_str)
-        return
-
-    # loading source data
-    with h5py.File(drs_file_path, 'r') as store:
-        time = np.array(store['Time'+drs_value_type]).flatten()
-    datetime = pd.to_datetime(time * 24 * 3600 * 1e9)
-
-    use_mask = True
-    in_PEA = False
-    offset = 0.1  # TODO maybe ask/ magic number
-    mask_collection = []
-    datetime_collection = []
-    residual_collection = []
-    boundarie_collection = []
-    for interval_nr in interval_array:
-        groupname = 'Interval'+str(interval_nr)
-        print(groupname)
-        with h5py.File(interval_file_path, 'r') as interval_source:
-            data = interval_source[groupname]
-            low_limit = pd.to_datetime(data.attrs['LowLimit'])
-            upp_limit = pd.to_datetime(data.attrs['UppLimit'])
-            interval_indices = np.array(data['IntervalIndices'])
-            print(interval_indices.shape)
-            if(use_mask):
-                mask = np.array(data[drs_value_type+'Mask'][:, value_index])
-                print(mask.shape)
-                mask_collection.append(mask)
-        with h5py.File(residual_file_path, 'r') as residual_tab:
-            data = residual_tab[groupname]
-            residual = np.array(data[drs_value_type+'residual'][:, value_index])
-            print(residual.shape)
-        datetime_interval = datetime[interval_indices]
-
-        ylabel_str = '(f(t)-'+drs_value_type+'Mean) /$\mathrm{mV}$'
-        if(in_PEA):
-            ylabel_str = '(f(t)-'+drs_value_type+'Mean) /$\mathrm{PEA}$'
-            for drs_value_index in range(len(residual_collection)):
-                residual *= PEAFACTOR
-
-        datetime_collection.append(datetime_interval)
-        residual_collection.append(residual)
-        boundarie_collection.append([low_limit, upp_limit])
-
-    nr_of_intervals = len(interval_array)
-    datetime_collection_ = np.concatenate(datetime_collection)
-    residual_collection_ = np.concatenate(residual_collection)
-    min_res, max_res = np.amin(residual_collection_), np.amax(residual_collection_)
-    for interval_index in range(nr_of_intervals):
-        datetime = datetime_collection[interval_index]
-        residual = residual_collection[interval_index]
-        low_limit, upp_limit = boundarie_collection[interval_index]
-        c = [float(interval_index)/float(nr_of_intervals),
-             0.0,
-             float(nr_of_intervals-1-interval_index)/float(nr_of_intervals)]
-        plt.plot([low_limit, low_limit], [min_res-offset, max_res+offset], 'k-')
-        plt.plot([upp_limit, upp_limit], [min_res-offset, max_res+offset], 'k-')
-
-        plt.annotate(s='', xy=(low_limit, 0), xytext=(upp_limit, 0),
-                     arrowprops=dict(arrowstyle='<->', color=c))
-
-        if(use_mask):
-            mask_u = mask_collection[interval_index]
-            mask_nu = np.logical_not(mask_u)
-            plt.plot(datetime[mask_u], residual[mask_u], 'x', color=c)
-            plt.plot(datetime[mask_nu], residual[mask_nu], '*', color=c)
-        else:
-            plt.plot(datetime, residual, 'x', color=c)
-
-    plt.title(drs_value_type+'residual \n CHID: '+str(chid)+' Cell: '+str(cell))
-    plt.ylabel(ylabel_str)
-    plt.gcf().autofmt_xdate()
-    plt.xlim(pd.to_datetime(np.amin(datetime_collection_)).date()-pd.DateOffset(days=7),
-             pd.to_datetime(np.amax(datetime_collection_)).date()+pd.DateOffset(days=7))
-    plt.ylim(min_res-offset, max_res+offset)
-    plt.grid()
-    plt.text(0.02, 0.2, 'preliminary', fontdict=font, transform=plt.gca().transAxes)
-    if(store_file_path is not None):
-        plt.savefig(store_file_path)
-    plt.show()
-    plt.close()
-
-
-@click.command()
-@click.argument('drs_file_path',
-                default='/net/big-tank/POOL/projects/fact/drs4_calibration_data/' +
-                        'calibration/calculation/dataCollection.h5',
-                type=click.Path(exists=True))
-@click.argument('interval_file_path',
-                default='/net/big-tank/POOL/projects/fact/drs4_calibration_data/' +
-                        'calibration/calculation/intervalIndices.h5',
-                type=click.Path(exists=True))
-@click.argument('residual_file_path',
-                default='/net/big-tank/POOL/projects/fact/drs4_calibration_data/' +
-                        'calibration/residual/drsresidual_.h5',
-                type=click.Path(exists=True))
-@click.argument('interval_array',
-                default=[1])
-@click.argument('drs_value_type',
-                default='Baseline')
-@click.argument('chid',
-                default=1400)
-@click.argument('restrict_residual',
-                default=True,
-                type=click.BOOL)
-@click.argument('store_file_path',
-                default='/home/fschulz/plots/residualBaseline_chid1000_cap500_3Intervals_RestrictParts.jpg',
-                type=click.Path(exists=False))
-####################################################################################################
-def residual_mean_per_chid(drs_file_path, interval_file_path, residual_file_path, interval_array, drs_value_type,
-                             chid, restrict_residual, store_file_path):
-
-    with h5py.File(drs_file_path, 'r') as store:
-        time = np.array(store['Time'+drs_value_type]).flatten()
-        datetime = pd.to_datetime(time * 24 * 3600 * 1e9)
-
-    date = datetime.date
-
-    offset = 0.1  # TODO maybe ask/ magic number
-    time_collection = []
-    residual_collection = []
-    for interval_nr in interval_array:
-        groupname = 'Interval'+str(interval_nr)
-        with h5py.File(residual_file_path, 'r') as residual_tab:
-            data = residual_tab[groupname]
-
-            low_limit = pd.to_datetime(data.attrs['LowLimit'])
-            upp_limit = pd.to_datetime(data.attrs['UppLimit'])
-
-            residual = np.array(data[drs_value_type+'residual'][chid*NRCELL: (chid+1)*NRCELL])
-
-        interval_indices = np.where((datetime >= low_limit) & (datetime <= upp_limit))[0]
-        datetime_interval = datetime[interval_indices]
-        with h5py.File(drs_file_path, 'r') as store:
-            drs_value_var = np.array(store[drs_value_type+'Std'][interval_indices, chid*NRCELL: (chid+1)*NRCELL])
-
-        if(False):  # TODO fix
-            print(drs_value_var.shape)
-            drs_value_var_mean = np.mean(drs_value_var, dtype='float64', axis=1)
-            print(drs_value_var_mean.shape)
-            drs_value_var_limit = drs_value_var_mean*2  # cut_off_factor[drs_value_type]
-            indices_used_values = np.where(drs_value_var_mean < drs_value_var_limit)[0]
-            indices_not_used_values = np.where(drs_value_var_mean >= drs_value_var_limit)[0]
-            print(residual.shape)
-            print(indices_used_values)
-            residual = residual[: , indices_used_values]
-            datetime_interval = datetime_interval[indices_used_values]
-
-        residual_mean_per_chid = np.mean(residual, dtype='float64', axis=0)
-        residual_collection.append(residual_mean_per_chid)
-        time_collection.append(datetime_interval)
-
-        nr_of_intervals = len(interval_array)
-        interval_nr =1  # TODO fix
-        c = [float(interval_nr-1)/float(nr_of_intervals),
-             0.0,
-             float(nr_of_intervals-1-(interval_nr-1))/float(nr_of_intervals)]
-        min_res, max_res = min(residual_mean_per_chid), max(residual_mean_per_chid)  # TODO set lower
-        plt.plot([low_limit, low_limit], [min_res-offset, max_res+offset], 'k-')
-        plt.plot([upp_limit, upp_limit], [min_res-offset, max_res+offset], 'k-')
-
-        plt.annotate(s='', xy=(low_limit, 0), xytext=(upp_limit, 0),
-                     arrowprops=dict(arrowstyle='<->', color=c))
-
-        plt.plot(datetime_interval, residual_mean_per_chid, 'x', color=c)
-
-    residual_list = np.concatenate(residual_collection).ravel()
-    time_list = np.concatenate(time_collection).ravel()
-
-    min_res, max_res = min(residual_list), max(residual_list)
-
-    # plt.errorbar(datetime, residualMean, yerr=residualMeanStd, fmt='x',
-    #              label=(drs_value_type+r'Mean - f(t)'))
-    plt.title(drs_value_type+'residual Mean:')
-    plt.ylabel('(f(t)-'+drs_value_type+'Mean)/$\mathrm{mV}$')
-    plt.gcf().autofmt_xdate()
-    #plt.xlim(min(date)-pd.DateOffset(days=7), max(date)+pd.DateOffset(days=7))
-    plt.ylim(min_res-offset, max_res+offset)
-    plt.grid()
-    plt.text(0.02, 0.2, 'preliminary', fontdict=font, transform=plt.gca().transAxes)
-    if(store_file_path is not None):
-        plt.savefig(store_file_path)
-    plt.show()
-    plt.close()
-
-
-@click.command()
-@click.argument('drs_file_path',
-                default='/net/big-tank/POOL/projects/fact/drs4_calibration_data/' +
-                        'calibration/calculation/dataCollection.h5',
-                type=click.Path(exists=True))
-@click.argument('interval_file_path',
-                default='/net/big-tank/POOL/projects/fact/drs4_calibration_data/' +
-                        'calibration/calculation/intervalIndices.h5',
-                type=click.Path(exists=True))
-@click.argument('residual_file_path',
-                default='/net/big-tank/POOL/projects/fact/drs4_calibration_data/' +
-                        'calibration/residual/drsresidual.h5',
-                type=click.Path(exists=True))
-@click.argument('interval_array',
-                default=[3])
-@click.argument('drs_value_type',
-                default='Baseline')
-@click.argument('crate_nr',
-                default=1)
-@click.argument('restrict_residual',
-                default=True,
-                type=click.BOOL)
-@click.argument('store_file_path',
-                default='/home/fschulz/plots/residualBaseline_chid1000_cap500_3Intervals_RestrictParts.jpg',
-                type=click.Path(exists=False))
-####################################################################################################
-def residual_mean_per_crate(drs_file_path, interval_file_path, residual_file_path, interval_array, drs_value_type,
-                             crate_nr, restrict_residual, store_file_path):
-
-    crate_index = crate_nr-1
-    with h5py.File(drs_file_path, 'r') as store:
-        time = np.array(store['Time'+drs_value_type]).flatten()
-        datetime = pd.to_datetime(time * 24 * 3600 * 1e9)
-
-    date = datetime.date
-
-    offset = 0.1  # TODO maybe ask/ magic number
-    time_collection = []
-    residual_collection = []
-    for interval_nr in interval_array:
-        groupname = 'Interval'+str(interval_nr)
-        with h5py.File(residual_file_path, 'r') as residual_tab:
-            data = residual_tab[groupname]
-
-            low_limit = pd.to_datetime(data.attrs['LowLimit'])
-            upp_limit = pd.to_datetime(data.attrs['UppLimit'])
-
-            residual = np.array(data[drs_value_type+'residual'][crate_index*int(NRCHID/4)*NRCELL: (crate_index+1)*int(NRCHID/4)*NRCELL])
-
-        interval_indices = np.where((datetime >= low_limit) & (datetime <= upp_limit))[0]
-        datetime_interval = datetime[interval_indices]
-        with h5py.File(drs_file_path, 'r') as store:
-            drs_value_var = np.array(store[drs_value_type+'Std'][crate_index*int(NRCHID/4)*NRCELL: (crate_index+1)*int(NRCHID/4)*NRCELL])
-
-        if(False):  # TODO fix
-            print(drs_value_var.shape)
-            drs_value_var_mean = np.mean(drs_value_var, dtype='float64', axis=1)
-            print(drs_value_var_mean.shape)
-            drs_value_var_limit = drs_value_var_mean*2  # cut_off_factor[drs_value_type]
-            indices_used_values = np.where(drs_value_var_mean < drs_value_var_limit)[0]
-            indices_not_used_values = np.where(drs_value_var_mean >= drs_value_var_limit)[0]
-            print(residual.shape)
-            print(indices_used_values)
-            residual = residual[: , indices_used_values]
-            datetime_interval = datetime_interval[indices_used_values]
-
-        residual_mean_per_chid = np.mean(residual, dtype='float64', axis=0)
-        residual_collection.append(residual_mean_per_chid)
-        time_collection.append(datetime_interval)
-
-        nr_of_intervals = len(interval_array)
-        interval_nr =1  # TODO fix
-        c = [float(interval_nr-1)/float(nr_of_intervals),
-             0.0,
-             float(nr_of_intervals-1-(interval_nr-1))/float(nr_of_intervals)]
-        min_res, max_res = min(residual_mean_per_chid), max(residual_mean_per_chid)  # TODO set lower
-        plt.plot([low_limit, low_limit], [min_res-offset, max_res+offset], 'k-')
-        plt.plot([upp_limit, upp_limit], [min_res-offset, max_res+offset], 'k-')
-
-        plt.annotate(s='', xy=(low_limit, 0), xytext=(upp_limit, 0),
-                     arrowprops=dict(arrowstyle='<->', color=c))
-
-        plt.plot(datetime_interval, residual_mean_per_chid, 'x', color=c)
-
-    residual_list = np.concatenate(residual_collection).ravel()
-    time_list = np.concatenate(time_collection).ravel()
-
-    min_res, max_res = min(residual_list), max(residual_list)
-
-    # plt.errorbar(datetime, residualMean, yerr=residualMeanStd, fmt='x',
-    #              label=(drs_value_type+r'Mean - f(t)'))
-    plt.title(drs_value_type+'residual Mean:')
-    plt.ylabel('(f(t)-'+drs_value_type+'Mean)/$\mathrm{mV}$')
-    plt.gcf().autofmt_xdate()
-    #plt.xlim(min(date)-pd.DateOffset(days=7), max(date)+pd.DateOffset(days=7))
-    plt.ylim(min_res-offset, max_res+offset)
-    plt.grid()
-    plt.text(0.02, 0.2, 'preliminary', fontdict=font, transform=plt.gca().transAxes)
-    if(store_file_path is not None):
-        plt.savefig(store_file_path)
-    plt.show()
-    plt.close()
-
-
-####################################################################################################
-def residualMeanOfAllCellsPerCrates(drs_file_path, residualFilenameArray_, drs_value_type,
-                                     restrict_residual, store_file_path=None):
-
-    nr_of_intervals = len(residualFilenameArray_)
-
-    print("Loading '"+drs_value_type+"-data' ...")
-    with h5py.File(drs_file_path, 'r') as store:
-        time = np.array(store['Time'+drs_value_type]).flatten()
-        datetime = pd.to_datetime(time * 24 * 3600 * 1e9)
-
-    date = datetime.date
-    datetime = np.array(datetime)
-
-    intervalList = []
-    residualPairList = []
-    min_res, max_res = 0, 0
-    min_res_, max_res_ = 0, 0
-    for residualFilename in residualFilenameArray_:
-        with h5py.File(residualFilename, 'r') as residual_tab:
-            residual = np.array(residual_tab['residual'+drs_value_type])
-            residualMean = np.mean(residual, dtype='float64', axis=0)
-            residualMeanC1 = np.mean(residual[0*9*NRCELL:40*9*NRCELL, :], dtype='float64', axis=0)
-            residualMeanC2 = np.mean(residual[40*9*NRCELL:80*9*NRCELL, :], dtype='float64', axis=0)
-            residualMeanC3 = np.mean(residual[80*9*NRCELL:120*9*NRCELL, :], dtype='float64', axis=0)
-            residualMeanC4 = np.mean(residual[120*9*NRCELL:160*9*NRCELL, :], dtype='float64', axis=0)
-
-            residualMeanPerCrates = np.array([residualMeanC1, residualMeanC2,
-                                              residualMeanC3, residualMeanC4,
-                                              residualMean])
-
-            interval_b = np.array(residual_tab['Interval'])
-
-            interval = []
-            for intervalLimit in interval_b:
-                interval.append(pd.to_datetime(intervalLimit[0].decode('UTF-8')).date())
-
-            if(restrict_residual):
-                intervalIndices = np.where((date >= interval[0]) & (date <= interval[1]))[0]
-
-                residualPair = [datetime[intervalIndices], residualMeanPerCrates[:, intervalIndices]]
-            else:
-                residualPair = [datetime, residualMeanPerCrates]
-
-            min_res_, max_res_ = np.amin(residualPair[1]), np.amax(residualPair[1])
-            if(min_res_ < min_res):
-                min_res = min_res_
-            if(max_res_ > max_res):
-                max_res = max_res_
-
-        intervalList.append(interval)
-        residualPairList.append(residualPair)
-
-    offset = min([abs(min_res*0.1), abs(max_res*0.1)])
-    if(nr_of_intervals > 1):
-        for intervalIndex in range(nr_of_intervals):
-            plt.plot([intervalList[intervalIndex][0], intervalList[intervalIndex][0]],
-                     [min_res-offset, max_res+offset], 'k-')
-            plt.plot([intervalList[intervalIndex][1], intervalList[intervalIndex][1]],
-                     [min_res-offset, max_res+offset], 'k-')
-
-            print(residualPairList[intervalIndex][0].shape, residualPairList[intervalIndex][1].shape)
-
-            print(residualPairList[intervalIndex][0].shape, residualPairList[intervalIndex][1][0].shape)
-            print(residualPairList[intervalIndex][0].shape, residualPairList[intervalIndex][1][1].shape)
-            print(residualPairList[intervalIndex][0].shape, residualPairList[intervalIndex][1][2].shape)
-
-            plt.plot(residualPairList[intervalIndex][0], residualPairList[intervalIndex][1][0])
-            plt.plot(residualPairList[intervalIndex][0], residualPairList[intervalIndex][1][1])
-            plt.plot(residualPairList[intervalIndex][0], residualPairList[intervalIndex][1][2])
-            plt.plot(residualPairList[intervalIndex][0], residualPairList[intervalIndex][1][3])
-            plt.plot(residualPairList[intervalIndex][0], residualPairList[intervalIndex][1][4])
-
-        plt.plot(residualPairList[0][0], residualPairList[0][1][0], 'bx', label='Crate 1')
-        plt.plot(residualPairList[0][0], residualPairList[0][1][1], 'gx', label='Crate 2')
-        plt.plot(residualPairList[0][0], residualPairList[0][1][2], 'yx', label='Crate 3')
-        plt.plot(residualPairList[0][0], residualPairList[0][1][3], 'rx', label='Crate 4')
-        plt.plot(residualPairList[0][0], residualPairList[0][1][4], 'ko', label='Crate 1-4')
-        plt.plot([date[0], date[0]], [min_res, max_res], 'k-', label='Interval boundary')
-
-    else:
-        plt.plot(datetime, residualMeanC1, 'bx', label='Crate 1')
-        plt.plot(datetime, residualMeanC2, 'gx', label='Crate 2')
-        plt.plot(datetime, residualMeanC3, 'yx', label='Crate 3')
-        plt.plot(datetime, residualMeanC4, 'rx', label='Crate 4')
-        plt.plot(datetime, residualMean, 'ko', label='Crate 1-4')
-
-    plt.title(drs_value_type+'residual Mean per Crate:')
-    plt.ylabel('(f(t)-'+drs_value_type+r'Mean)/$\mathrm{mV}$')
-    plt.gcf().autofmt_xdate()
-    plt.xlim(min(date)-pd.DateOffset(days=7), max(date)+pd.DateOffset(days=7))
-    plt.ylim(min_res-offset, max_res+offset)
-    plt.grid()
-    plt.legend(loc='lower left', numpoints=1)
-    plt.text(0.02, 0.2, 'preliminary', fontdict=font, transform=plt.gca().transAxes)
-    if(store_file_path is not None):
-        plt.savefig(store_file_path)
-    plt.show()
-    plt.close()
-
-
-####################################################################################################
-def residualMeanPerPatchAndInterval(drs_file_path, residualFilenameArray_, drs_value_type, store_file_path=None):
-
-    print("Loading '"+drs_value_type+"-data' ...")
-    with h5py.File(drs_file_path, 'r') as store:
-        time = np.array(store['Time'+drs_value_type]).flatten()
-        date = pd.to_datetime(time * 24 * 3600 * 1e9).date
-
-    residualMeanPerPatchAndInterval = []
-    for residualFilename in residualFilenameArray_:
-        intervalresidualMeanPerPatch = []
-        with h5py.File(residualFilename, 'r') as residual_tab:
-            interval_b = np.array(residual_tab['Interval'])
-
-            interval = []
-            for intervalLimit in interval_b:
-                interval.append(pd.to_datetime(intervalLimit[0].decode('UTF-8')).date())
-
-            intervalIndices = np.where((date >= interval[0]) & (date <= interval[1]))[0]
-
-            residual = np.array(residual_tab['residual'+drs_value_type])[:, intervalIndices]
-        for patchNr in range(NRPATCH):
-            intervalresidualMeanPerPatch.append(
-                np.mean(abs(
-                            residual[patchNr*9*NRCELL:(patchNr+1)*9*NRCELL].flatten()
-                            ), dtype='float64'))
-        residualMeanPerPatchAndInterval.append(intervalresidualMeanPerPatch)
-
-    residualMeanPerPatchAndInterval = np.array(residualMeanPerPatchAndInterval).transpose()
-
-    plt.matshow(residualMeanPerPatchAndInterval, interpolation='None', aspect='auto')
-    # plt.title(r'Mean of the absolute '+str(drs_value_type)+'residual-value \n per Interval ', fontsize=25, y=1.02)
-    cbar = plt.colorbar()
-    resMax = residualMeanPerPatchAndInterval.shape
-    for x in range(resMax[1]+1):
-        plt.plot([x-0.5, x-0.5], [-0.5, resMax[0]-0.5], 'k:')
-    for y in range(4+1):
-        y = y*40
-        plt.plot([-0.5, resMax[1]-0.5], [y-0.5, y-0.5], 'k:')
-    plt.xlabel('IntervalNr', fontsize=20)
-    plt.ylabel('PatchNr', fontsize=20)
-    plt.tick_params(axis='both', which='major', direction='out', labelsize=16)
-    cbar.ax.tick_params(labelsize=16)
-    plt.gca().xaxis.set_ticks_position('bottom')
-    plt.xticks(np.arange(0, 160, 20))
-    plt.gca().invert_yaxis()
-    DefaultSize = plt.gcf().get_size_inches()
-    plt.gcf().set_size_inches(DefaultSize[0]*2.5, DefaultSize[1], forward=True)
-    plt.xlim(-0.5, resMax[1]-0.5)
-    plt.ylim(-0.5, resMax[0]-0.5)
     if(store_file_path is not None):
         plt.savefig(store_file_path)
     plt.show()

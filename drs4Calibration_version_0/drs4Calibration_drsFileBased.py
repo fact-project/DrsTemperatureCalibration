@@ -55,6 +55,7 @@ def search_drs_files(drs_file_list_doc_path: str):
                        'fNumEvents'])
     drs_file_infos = drs_infos.query(
                                      'fNight > 20120000 &' +
+                                     'fNight < 20170801 &' +
                                      'fRunTypeKey == 2 &' +
                                      'fDrsStep == 2 &' +
                                      'fNumEvents == 1000').copy()

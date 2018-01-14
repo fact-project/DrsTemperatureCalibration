@@ -9,10 +9,20 @@ import writeSecondaryFiles as write
 
 #write.drs_pedestal_run_mean_and_std()
 
-plot.pedestel_mean_or_std_vs_temp_()
+#plot.general_drs_value_cell()
+#plot.general_drs_value_cell_residual()
+
+#plot.drs_value_std_hist_per_chid_cell()
 #plot.drs_value_std_hist()
+
+plot.drs_model_parameter_fact_cam()
 #plot.drs_value_cell()
+#plot.drs_model_parameter_hist()
+
+#plot.pedestel_mean_or_std_vs_temp_()
+
 #plot.drs_fit_value_residual_hist()
 #plot.residual_fact_cam()
 #plot.worst_cell_collection_selected_by_residual()
+
 #plot.drs_values_chi2_outlier_cell_collection()

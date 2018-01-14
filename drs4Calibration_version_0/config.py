@@ -9,7 +9,7 @@ drsValueTypes = ['Baseline',
                  'TriggerOffset']
 renamedDrsValueTypes = ['Baseline',
                         'Gain',
-                        'ROIOffset']  # rename TriggerOffset
+                        'ROIOffset']  # renamed TriggerOffset
 nrCellsPerChid = {'Baseline': NRCELL,
                   'Gain': NRCELL,
                   'ROIOffset': ROI}

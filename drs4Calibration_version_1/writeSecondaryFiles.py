@@ -37,14 +37,15 @@ from constants import NRCHID
                          'version_1/drsFitParameter_interval3.fits'),
                 type=click.Path(exists=True))
 @click.argument('time_interval',
-                default=['2015-05-26', '2017-10-01'])  # ['2014-05-20', '2015-05-26'], ['2015-05-26', '2017-10-01']
+                default=['2015-06-23', '2017-02-01'])  # ['2014-05-20', '2015-05-26'], ['2015-05-26', '2017-10-01']
 ###############################################################################
 def drs_pedestal_run_mean_and_std(source_folder_path, store_folder_path,
                                   facttools_file_path, facttools_xml_path,
                                   fitparameter_file_path_temp, time_interval):
-    jobs = 5
-    verbosity = 10
+    jobs = 7
+    verbosity = 0
 
+    pool = Parallel(n_jobs=jobs, verbose=verbosity, max_nbytes='50G')
     with fits.open(fitparameter_file_path_temp) as tab:
         interval_limits = [tab[0].header['LowLimit'], tab[0].header['UppLimit']]
 
@@ -67,7 +68,7 @@ def drs_pedestal_run_mean_and_std(source_folder_path, store_folder_path,
 
     # loop over the start_date to end_date interval
     pre_filename = 'pedestelStats_'
-    for date in tqdm(pd.date_range(start=time_interval[0], end=time_interval[1], freq='D')):
+    for date in tqdm(pd.date_range(start=time_interval[0], end=time_interval[1], freq='2D')):
 
         date_str = date.strftime('%Y%m%d')
 
@@ -166,6 +167,7 @@ def drs_pedestal_run_mean_and_std(source_folder_path, store_folder_path,
         nr_runs_of_the_day = len(existing_pedestel_run_files)
         temp_diff_list = [np.nan] * nr_runs_of_the_day
         store_file_list = [np.nan] * nr_runs_of_the_day
+        print('Process runs of ', date_str)
         for run_index in range(nr_runs_of_the_day):
             run_file = existing_pedestel_run_files[run_index]
             run_id = existing_pedestel_run_ids[run_index]
@@ -186,7 +188,6 @@ def drs_pedestal_run_mean_and_std(source_folder_path, store_folder_path,
                                date_str+'_{0:03d}'.format(run_id)+'_tmp.fits')
             store_file_list[run_index] = store_file_path
 
-        pool = Parallel(n_jobs=jobs, verbose=verbosity, max_nbytes='50G')
         pool(delayed(run_fact_tools)(
              facttools_file_path,
              facttools_xml_path,
@@ -250,6 +251,9 @@ def drs_pedestal_run_mean_and_std(source_folder_path, store_folder_path,
 
                 # os.remove(source_file)
         # os.rmdir(store_folder_path_tmp)
+        if(len(used_pedestel_run_ids) == 0):
+            continue
+
         print('Write Data to Table')
         tbhduStats = fits.BinTableHDU.from_columns(
                 [fits.Column(
