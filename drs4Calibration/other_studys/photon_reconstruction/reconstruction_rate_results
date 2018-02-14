@@ -1,0 +1,30 @@
+#DRS-File
+true_number_of_photons:  1 , noise:  2.20521859428 , offset:  -0.0585571991849 , reconstruction_rate:  99.66
+true_number_of_photons:  2 , noise:  2.20521859428 , offset:  -0.0585571991849 , reconstruction_rate:  99.96
+true_number_of_photons:  3 , noise:  2.20521859428 , offset:  -0.0585571991849 , reconstruction_rate:  100.0
+true_number_of_photons:  1 , noise:  2.01548650104 , offset:  -0.0375109082183 , reconstruction_rate:  99.83
+true_number_of_photons:  2 , noise:  2.01548650104 , offset:  -0.0375109082183 , reconstruction_rate:  99.99
+true_number_of_photons:  3 , noise:  2.01548650104 , offset:  -0.0375109082183 , reconstruction_rate:  100.0
+true_number_of_photons:  1 , noise:  2.00934773846 , offset:  -0.0374080156656 , reconstruction_rate:  99.84
+true_number_of_photons:  2 , noise:  2.00934773846 , offset:  -0.0374080156656 , reconstruction_rate:  99.99
+true_number_of_photons:  3 , noise:  2.00934773846 , offset:  -0.0374080156656 , reconstruction_rate:  100.0
+
+# Version 0
+true_number_of_photons:  1 , noise:  2.2049917915 , offset:  -0.171262524745 , reconstruction_rate:  99.58
+true_number_of_photons:  2 , noise:  2.2049917915 , offset:  -0.171262524745 , reconstruction_rate:  99.96
+true_number_of_photons:  3 , noise:  2.2049917915 , offset:  -0.171262524745 , reconstruction_rate:  100.0
+true_number_of_photons:  1 , noise:  2.04817937786 , offset:  0.0730133891913 , reconstruction_rate:  99.84
+true_number_of_photons:  2 , noise:  2.04817937786 , offset:  0.0730133891913 , reconstruction_rate:  99.99
+true_number_of_photons:  3 , noise:  2.04817937786 , offset:  0.0730133891913 , reconstruction_rate:  100.0
+true_number_of_photons:  1 , noise:  2.01951906528 , offset:  0.182115850201 , reconstruction_rate:  99.89
+true_number_of_photons:  2 , noise:  2.01951906528 , offset:  0.182115850201 , reconstruction_rate:  99.99
+true_number_of_photons:  3 , noise:  2.01951906528 , offset:  0.182115850201 , reconstruction_rate:  100.00
+
+# Version 1
+
+true_number_of_photons:  1 , noise:  1.97767098783 , offset:  -0.126335068067 , reconstruction_rate:  99.82
+true_number_of_photons:  2 , noise:  1.97767098783 , offset:  -0.126335068067 , reconstruction_rate:  99.99
+true_number_of_photons:  3 , noise:  1.97767098783 , offset:  -0.126335068067 , reconstruction_rate:  100.0
+true_number_of_photons:  1 , noise:  1.9451592982 , offset:  -0.0173001362963 , reconstruction_rate:  99.88
+true_number_of_photons:  2 , noise:  1.9451592982 , offset:  -0.0173001362963 , reconstruction_rate:  99.99
+true_number_of_photons:  3 , noise:  1.9451592982 , offset:  -0.0173001362963 , reconstruction_rate:  100.0
